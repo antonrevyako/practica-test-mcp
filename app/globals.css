@@ -1155,42 +1155,6 @@ pre {
   padding: 10px;
 }
 
-.setup-prompt {
-  margin: 24px 0;
-  padding: 22px;
-  background: #f1f6eb;
-  border: 1px solid #dce7d1;
-  border-radius: 12px;
-}
-.setup-prompt h3 {
-  margin-top: 7px;
-  font-size: 18px;
-  letter-spacing: -0.4px;
-}
-.setup-prompt p {
-  margin: 10px 0 18px;
-  color: #73816c;
-  font-size: 12px;
-  line-height: 1.8;
-}
-.setup-prompt .small {
-  display: block;
-  margin-top: 10px;
-}
-.setup-prompt details {
-  margin-top: 16px;
-}
-.setup-prompt summary {
-  cursor: pointer;
-  color: #60814e;
-  font-size: 11px;
-}
-.setup-prompt pre {
-  max-height: 320px;
-  overflow: auto;
-  background: #fafcf7;
-}
-
 .endpoint code {
   overflow-wrap: anywhere;
 }

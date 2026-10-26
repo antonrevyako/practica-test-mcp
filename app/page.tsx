@@ -89,8 +89,6 @@ export default function Home() {
   const [history, setHistory] = useState<Attempt[]>([]);
   const [token, setToken] = useState("");
   const [copied, setCopied] = useState(false);
-  const [setupPrompt, setSetupPrompt] = useState("");
-  const [promptCopied, setPromptCopied] = useState(false);
   const [publicUrl, setPublicUrl] = useState("");
   const [chatgptUrl, setChatgptUrl] = useState("");
   const [webUrl, setWebUrl] = useState("");
@@ -103,7 +101,6 @@ export default function Home() {
 
   function applyConnection(connection: ConnectionInfo) {
     setToken(connection.token);
-    setSetupPrompt(connection.prompt ?? "");
     setPublicUrl(connection.publicUrl ?? "");
     setChatgptUrl(connection.chatgptUrl ?? "");
     setWebUrl(connection.webUrl ?? "");
@@ -126,11 +123,10 @@ export default function Home() {
     };
   }, [tab]);
   useEffect(() => {
-    setPromptCopied(false);
     setUrlCopied(false);
     setWebUrlCopied(false);
     setCopied(false);
-  }, [setupPrompt]);
+  }, [token, publicUrl, chatgptUrl, webUrl]);
 
   useEffect(() => {
     api<SessionStatus>("session")
@@ -249,12 +245,9 @@ export default function Home() {
     if (next === "mcp")
       await action(async () => {
         setToken("");
-        setSetupPrompt("");
         setCopied(false);
-        setPromptCopied(false);
         const connection = await api<ConnectionInfo>("connection");
         applyConnection(connection);
-        setPromptCopied(false);
       });
     if (next === "history" && session?.authenticated)
       await action(async () => {
@@ -485,48 +478,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-              <div className="setup-prompt">
-                <div className="eyebrow">AFTER CONNECTING CHATGPT</div>
-                <h3>Copy the session instructions.</h3>
-                <p>
-                  First create, install and select PracticaTest using the
-                  ChatGPT guide. Then paste this prompt into your chat. A prompt
-                  alone cannot register or enable an MCP connection. It includes
-                  the current URL and authorization details.
-                </p>
-                <button
-                  className="primary full"
-                  disabled={busy || !setupPrompt}
-                  onClick={() =>
-                    void action(async () => {
-                      await navigator.clipboard.writeText(setupPrompt);
-                      setPromptCopied(true);
-                      setTimeout(() => setPromptCopied(false), 2500);
-                    })
-                  }
-                >
-                  {promptCopied
-                    ? "Prompt copied ✓"
-                    : "Copy setup prompt with token"}
-                  <span aria-hidden="true">↗</span>
-                </button>
-                <span className="small" role="status" aria-live="polite">
-                  {promptCopied
-                    ? "Ready to paste into your chat."
-                    : setupPrompt
-                      ? "Includes the private connection link and MCP token. The link survives app restarts; copy a new one only if the tunnel restarts."
-                      : tunnel?.status === "installing"
-                        ? "Downloading and verifying cloudflared on first launch…"
-                        : "The prompt will be ready when Cloudflare connects."}
-                </span>
-                <details>
-                  <summary>Preview the instruction</summary>
-                  <pre>
-                    {setupPrompt ||
-                      "Waiting for the public Cloudflare connection…"}
-                  </pre>
-                </details>
-              </div>
               <div className="code-title">
                 <strong>Other HTTP clients · Bearer token</strong>
                 <button

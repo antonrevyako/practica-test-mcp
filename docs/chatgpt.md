@@ -4,9 +4,9 @@
 
 1. Start the app and open **MCP connection**.
 2. Wait for **CLOUDFLARE HTTPS · READY**. On first launch, the app downloads the official `cloudflared` connector and verifies the release checksum. No Cloudflare account or domain is needed.
-3. The public HTTPS URL is displayed in the interface. Select **Copy public server URL**, or **Copy setup prompt with token** to copy the complete instruction. **Preview the instruction** shows exactly what will be copied.
+3. The public HTTPS URL is displayed in the interface. Select **Copy public server URL**.
 4. In ChatGPT Plugins, add a custom MCP server, choose **Server URL**, paste the copied URL, and choose **No authentication**. The link already contains a random private access key that the server validates. Select **Create as a plugin**, open it in your personal plugins and install it. Start a new **Work** chat, type **@** and select **PracticaTest**.
-5. Once the plugin is selected, paste the session instructions or practice prompt from the MCP page. Ask ChatGPT to call `session_status`, then `list_sections` with `permit=B` and `language=en`. Sign in using the MCP `login` tool, the local CLI, or the existing web interface.
+5. Once the plugin is selected, use the practice prompt from the MCP page. Ask ChatGPT to call `session_status`, then `list_sections` with `permit=B` and `language=en`. Sign in using the MCP `login` tool, the local CLI, or the existing web interface.
 
 The Cloudflare tunnel is already created by the application. You do not need an OpenAI tunnel, a local connector, an API key or configuration files. The current ChatGPT connection flow is documented in [Add custom MCP server](https://developers.openai.com/api/docs/guides/custom-mcp-server). A normal chat cannot change its own plugin connections from a prompt alone; register and select the plugin first, then use the generated prompt to start practising.
 
@@ -14,7 +14,7 @@ The Cloudflare tunnel is already created by the application. You do not need an 
 
 The ChatGPT URL includes a private access key. Anyone with that full URL can use this single-user MCP connection, so share it only with your intended client. Choosing No authentication in ChatGPT means no separate OAuth step; the application's gateway still validates the key on every request.
 
-Clients that support request headers can use the public `/mcp` endpoint with `Authorization: Bearer <local MCP token>` instead. This alternative appears in the copyable configuration. The prompt includes both connection forms, but never your PracticaTest password.
+Clients that support request headers can use the public `/mcp` endpoint with `Authorization: Bearer <local MCP token>` instead. This alternative appears in the copyable configuration. The CLI connection prompt (`npm run chatgpt:prompt`) includes both connection forms, but never your PracticaTest password.
 
 MCP credentials authorize only MCP requests. The web interface, `/api/connection`, login form and other administrative API routes require the separate private interface link and browser session cookie; a valid MCP key alone cannot reach them. The gateway adds local authorization while forwarding MCP and does not log request paths or tokens. The local MCP identity is saved privately beside the database. URL access keys stay in the independent tunnel process memory; connection responses use `Cache-Control: no-store`.
 
@@ -67,7 +67,7 @@ docker compose -f compose.yaml -f compose.mcp.yaml up --build -d
 
 ## Tunnel lifecycle
 
-[Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) create temporary `trycloudflare.com` hostnames. The public URL and private URL key survive app-only restarts and change when the independent tunnel process stops and restarts. The interface refreshes its status and copied instruction automatically; update your ChatGPT connection with the new URL. Keep the app running while using it.
+[Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) create temporary `trycloudflare.com` hostnames. The public URL and private URL key survive app-only restarts and change when the independent tunnel process stops and restarts. The interface refreshes its status and displayed URLs automatically; update your ChatGPT connection with the new URL. Keep the app running while using it.
 
 If startup fails, the interface shows an error and **Retry Cloudflare Tunnel**. The local app remains available. Quick Tunnels are intended for testing and personal development and have no uptime guarantee; use a managed tunnel with a stable hostname for production.
 

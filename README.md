@@ -190,7 +190,7 @@ Without a Cloudflare account or domain, the `trycloudflare.com` hostname still b
 
 ## Use it from ChatGPT or Claude Desktop
 
-The **MCP connection** page shows the current Cloudflare HTTPS URL with **Copy public server URL** and **Copy setup prompt with token** buttons. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
+The **MCP connection** page shows the current Cloudflare HTTPS URL with a **Copy public server URL** button. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
 
 For ChatGPT, add the full public Server URL and choose **No authentication**: the URL already includes a private access key verified by this app. Claude Desktop can use the same public URL, or the generated local stdio configuration when this app runs natively on the same computer. The MCP connection cannot access web or administrative routes. Remote browser access uses the separate private interface link described below.
 
