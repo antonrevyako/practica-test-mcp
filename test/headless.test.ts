@@ -1,4 +1,6 @@
 import { test } from "node:test";
+import { CookieJar } from "tough-cookie";
+import { SessionStore } from "../src/provider/session-store.js";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
@@ -142,6 +144,27 @@ test("headless MCP starts without a UI, pairs stdio automatically and survives t
     };
     assert.notEqual(before.token, after.token);
     assert.equal(after.prompt, null);
+    assert.equal((await status()).authenticated, false);
+    const cookies = new CookieJar();
+    cookies.setCookieSync(
+      "session=synthetic-headless-session; Path=/; Secure; HttpOnly",
+      "https://practicatest.com",
+    );
+    const remembered = new SessionStore(directory);
+    remembered.save({
+      version: 1,
+      jar: cookies.serializeSync(),
+      csrf: "synthetic-csrf",
+      verifiedAt: new Date().toISOString(),
+      tracking: {},
+    });
+    await stop();
+    await start();
+    assert.equal((await status()).authenticated, true);
+    assert.equal((await status()).remembered, true);
+    await client.callTool({ name: "logout", arguments: {} });
+    await stop();
+    await start();
     assert.equal((await status()).authenticated, false);
   } finally {
     await client.close();

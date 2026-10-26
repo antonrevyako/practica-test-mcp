@@ -21,3 +21,11 @@ graphify-out/
 *.key
 *.p12
 *.pfx
+
+# Generated workspace state, including custom database locations
+session.enc
+session.enc.*.tmp
+session.key
+workspace.json
+workspace.json.*.tmp
+/images/

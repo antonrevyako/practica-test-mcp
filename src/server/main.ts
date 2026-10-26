@@ -17,6 +17,7 @@ import type { NextServer, NextServerOptions } from "next/dist/server/next.js";
 import { z } from "zod";
 import { Store } from "../db/database.js";
 import { PracticaTest } from "../provider/practicatest.js";
+import { SessionStore } from "../provider/session-store.js";
 import { StudyService } from "./study.service.js";
 import { ApiController } from "./api.controller.js";
 import { AppError } from "./errors.js";
@@ -62,7 +63,20 @@ class SafeErrors implements ExceptionFilter {
   providers: [
     StudyService,
     { provide: Store, useFactory: () => new Store() },
-    { provide: PracticaTest, useFactory: () => new PracticaTest() },
+    {
+      provide: PracticaTest,
+      inject: [Store],
+      useFactory: (store: Store) =>
+        new PracticaTest(
+          fetch,
+          store.dataDirectory
+            ? new SessionStore(
+                store.dataDirectory,
+                process.env.PERSIST_SESSION !== "false",
+              )
+            : undefined,
+        ),
+    },
     { provide: CloudflareTunnel, useFactory: () => new CloudflareTunnel() },
   ],
 })
@@ -106,7 +120,7 @@ async function main() {
   const timer = setInterval(() => study.status(), 60000);
   timer.unref();
   await app.listen(port, host);
-  void app.get(CloudflareTunnel).start(port);
+  void app.get(CloudflareTunnel).start(port, !mcpOnly);
   if (web) console.log(`PracticaTest Local: http://localhost:${port}`);
   console.log(`MCP: http://localhost:${port}/mcp`);
   console.log(
@@ -114,7 +128,7 @@ async function main() {
   );
   const shutdown = async () => {
     clearInterval(timer);
-    study.provider.logout();
+    study.provider.dispose();
     await app.close();
     await web?.close();
     process.exit(0);

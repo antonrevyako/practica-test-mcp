@@ -4,16 +4,25 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { dirname, resolve, join } from "node:path";
 import { mkdirSync, chmodSync } from "node:fs";
 import * as schema from "./schema.js";
+import { WorkspacePreferencesStore } from "../server/workspace-preferences.js";
 
 export class Store {
   readonly sqlite: Database.Database;
   readonly db;
   readonly imageDirectory: string | null;
+  readonly dataDirectory: string | null;
+  readonly preferences: WorkspacePreferencesStore;
   constructor(path = process.env.DATABASE_PATH ?? "./data/practica.sqlite") {
     if (path !== ":memory:")
       mkdirSync(dirname(resolve(path)), { recursive: true, mode: 0o700 });
+    this.dataDirectory = path === ":memory:" ? null : dirname(resolve(path));
     this.imageDirectory =
       path === ":memory:" ? null : join(dirname(resolve(path)), "images");
+    this.preferences = new WorkspacePreferencesStore(
+      path === ":memory:"
+        ? null
+        : join(dirname(resolve(path)), "workspace.json"),
+    );
     this.sqlite = new Database(path);
     if (path !== ":memory:") chmodSync(path, 0o600);
     this.sqlite.pragma("journal_mode = WAL");

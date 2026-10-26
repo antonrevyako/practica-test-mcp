@@ -6,6 +6,7 @@ export type ConnectionInfo = {
   localUrl: string;
   publicUrl: string | null;
   chatgptUrl: string | null;
+  webUrl: string | null;
   prompt: string | null;
   claudeDesktopConfig: string | null;
   tunnel: {
@@ -18,9 +19,17 @@ export type ConnectionInfo = {
       | "error";
     publicUrl: string | null;
     chatgptUrl: string | null;
+    webUrl: string | null;
     error: string | null;
   };
 };
+
+export const workspacePreferencesSchema = z
+  .object({
+    premiumPurchased: z.boolean(),
+  })
+  .strict();
+export type WorkspacePreferences = z.infer<typeof workspacePreferencesSchema>;
 
 export const credentialsSchema = z
   .object({
@@ -112,7 +121,20 @@ export type SectionRules = {
   images: { url: string; alt: string }[];
   tables: string[][][];
 };
+export type AccountAccess = {
+  permit: Permit;
+  language: "en" | "es";
+  checkedAt: string;
+  sectionCount: number;
+  topicTestCount: number;
+  fullRulesCount: number;
+  generalTestLinkCount: number | null;
+  premiumAccess: "available" | "not_confirmed";
+};
 export type SessionStatus = {
   authenticated: boolean;
   expiresAt: string | null;
+  remembered: boolean;
+  lastVerifiedAt: string | null;
+  access: AccountAccess[];
 };

@@ -12,6 +12,7 @@ export type TunnelStatus = {
     "disabled" | "starting" | "installing" | "ready" | "reconnecting" | "error";
   publicUrl: string | null;
   chatgptUrl: string | null;
+  webUrl: string | null;
   error: string | null;
 };
 export type TunnelDependencies = {
@@ -105,10 +106,12 @@ export class CloudflareTunnel {
   private timer: NodeJS.Timeout | null = null;
   private generation = 0;
   private port = 0;
+  private webEnabled = true;
   private value: TunnelStatus = {
     status: "starting",
     publicUrl: null,
     chatgptUrl: null,
+    webUrl: null,
     error: null,
   };
   constructor(
@@ -127,14 +130,16 @@ export class CloudflareTunnel {
   status(): TunnelStatus {
     return { ...this.value };
   }
-  async start(port: number): Promise<void> {
+  async start(port: number, webEnabled = true): Promise<void> {
     if (!this.deps.enabled) return;
     this.port = port;
+    this.webEnabled = webEnabled;
     const generation = ++this.generation;
     this.value = {
       status: "starting",
       publicUrl: null,
       chatgptUrl: null,
+      webUrl: null,
       error: null,
     };
     try {
@@ -143,7 +148,15 @@ export class CloudflareTunnel {
       });
       if (generation !== this.generation) return;
       const accessKey = randomBytes(32).toString("hex");
-      const gateway = await startGateway(port, localToken, accessKey);
+      const webAccessKey = webEnabled
+        ? randomBytes(32).toString("hex")
+        : undefined;
+      const gateway = await startGateway(
+        port,
+        localToken,
+        accessKey,
+        webAccessKey,
+      );
       if (generation !== this.generation) {
         gateway.server.close();
         return;
@@ -181,6 +194,7 @@ export class CloudflareTunnel {
             status: "ready",
             publicUrl: `${origin}/mcp`,
             chatgptUrl: `${origin}/mcp/${accessKey}`,
+            webUrl: webAccessKey ? `${origin}/app/${webAccessKey}` : null,
             error: null,
           };
         } else
@@ -188,6 +202,7 @@ export class CloudflareTunnel {
             status: "reconnecting",
             publicUrl: `${origin}/mcp`,
             chatgptUrl: null,
+            webUrl: null,
             error: null,
           };
       };
@@ -238,6 +253,7 @@ export class CloudflareTunnel {
           status: "error",
           publicUrl: null,
           chatgptUrl: null,
+          webUrl: null,
           error: "Cloudflare Tunnel disconnected. Retry the connection.",
         };
         this.child = null;
@@ -263,6 +279,7 @@ export class CloudflareTunnel {
         status: "error",
         publicUrl: null,
         chatgptUrl: null,
+        webUrl: null,
         error:
           "Could not start Cloudflare Tunnel. Check internet access or install cloudflared, then retry.",
       };
@@ -275,7 +292,7 @@ export class CloudflareTunnel {
     )
       return this.status();
     await this.stop();
-    void this.start(this.port);
+    void this.start(this.port, this.webEnabled);
     return this.status();
   }
   async stop() {

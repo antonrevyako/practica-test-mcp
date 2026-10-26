@@ -1274,3 +1274,93 @@ pre {
   margin: 10px 0;
   overflow-wrap: anywhere;
 }
+
+.toolbar-account {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+.toolbar-account .status {
+  padding-bottom: 0;
+}
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid #e1ce8b;
+  border-radius: 20px;
+  background: #fff7db;
+  color: #765716;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.premium-setting {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 0 0;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.premium-setting input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #997831;
+}
+.premium-setting span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.premium-setting strong {
+  font-size: 11px;
+  font-weight: 600;
+  color: #765716;
+}
+.premium-setting small {
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+@media (max-width: 650px) {
+  .toolbar-account {
+    justify-content: flex-start;
+    padding: 7px 0 10px;
+  }
+  .toolbar-account .status {
+    padding: 4px 0;
+  }
+}
+
+.refresh-access {
+  margin-top: 18px;
+}
+
+.remote-interface {
+  margin: 22px 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.remote-interface .endpoint {
+  margin: 0 0 14px;
+}
+.remote-interface-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.remote-interface-actions a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

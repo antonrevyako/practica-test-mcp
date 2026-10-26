@@ -51,8 +51,9 @@ export function parseSections(
       }
       try {
         manualUrl(url.href);
-        if (!/\/\d+\/?$/.test(url.pathname)) return;
-        if (/full|complet/i.test(label)) fullUrl = url.href;
+        if (!/\/\d+(?:\/full)?\/?$/.test(url.pathname)) return;
+        if (/full|complet/i.test(label) || /\/full\/?$/.test(url.pathname))
+          fullUrl = url.href;
         else summaryUrl = url.href;
       } catch {
         /* Skip plans, products and unrelated navigation. */

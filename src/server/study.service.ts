@@ -5,7 +5,12 @@ import { Store } from "../db/database.js";
 import { answerEvents, answers, runs } from "../db/schema.js";
 import { PracticaTest } from "../provider/practicatest.js";
 import { publicQuestion, type ParsedTest } from "../provider/parser.js";
-import type { AnswerFeedback, Permit, TestView } from "../shared/contracts.js";
+import type {
+  AnswerFeedback,
+  Permit,
+  TestView,
+  WorkspacePreferences,
+} from "../shared/contracts.js";
 import { AppError } from "./errors.js";
 import { ImageCache } from "../archive/image-cache.js";
 import { Statistics } from "../archive/statistics.js";
@@ -40,8 +45,19 @@ export class StudyService {
     this.queue = result.catch(() => undefined);
     return result;
   }
+  getPreferences() {
+    return this.store.preferences.get();
+  }
+  updatePreferences(value: WorkspacePreferences) {
+    return this.store.preferences.set(value);
+  }
   status() {
     return this.provider.status();
+  }
+  checkAccountAccess(permit: Permit = "B", language: "en" | "es" = "en") {
+    return this.exclusive(() =>
+      this.provider.checkAccountAccess(permit, language),
+    );
   }
   login(email: string, password: string) {
     return this.exclusive(async () => {

@@ -6,6 +6,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -23,6 +24,7 @@ import {
   permitSchema,
   sectionIdSchema,
   startSchema,
+  workspacePreferencesSchema,
 } from "../shared/contracts.js";
 import { StudyService } from "./study.service.js";
 import { createMcp } from "./mcp.js";
@@ -50,6 +52,21 @@ export class ApiController {
   @Delete("api/session") logout() {
     return this.study.logout();
   }
+  @Get("api/account/access") checkAccountAccess(
+    @Query("permit") permit?: string,
+    @Query("language") language?: string,
+  ) {
+    return this.study.checkAccountAccess(
+      permitSchema.parse(permit ?? "B"),
+      languageSchema.parse(language ?? "en"),
+    );
+  }
+  @Get("api/preferences") preferences() {
+    return this.study.getPreferences();
+  }
+  @Patch("api/preferences") updatePreferences(@Body() body: unknown) {
+    return this.study.updatePreferences(workspacePreferencesSchema.parse(body));
+  }
   @Get("api/connection") connection(@Req() req: Request) {
     const origin = `http://${req.headers.host}`;
     const port = Number(new URL(origin).port || 80);
@@ -60,6 +77,7 @@ export class ApiController {
       localUrl: `${origin}/mcp`,
       publicUrl: tunnel.publicUrl,
       chatgptUrl: tunnel.chatgptUrl,
+      webUrl: tunnel.webUrl,
       tunnel,
       claudeDesktopConfig:
         existsSync("/.dockerenv") || existsSync("/run/.containerenv")

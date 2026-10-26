@@ -107,6 +107,124 @@ test("public gateway authenticates MCP and keeps the UI and administrative API p
   }
 });
 
+test("private browser links authenticate UI and API access without granting that access to MCP clients", async () => {
+  const app = express();
+  let port = 0;
+  let premiumPurchased = true;
+  app.use((req, res, next) => localGuard(port)(req, res, next));
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    assert.equal(req.headers.cookie, undefined);
+    assert.equal(req.headers.origin, undefined);
+    assert.equal(req.headers.authorization, `Bearer ${localToken}`);
+    next();
+  });
+  app.get("/", (_req, res) =>
+    res.type("html").send("<h1>Practice interface</h1>"),
+  );
+  app.get("/_next/static/fixture.js", (_req, res) =>
+    res.type("js").send("fixture();"),
+  );
+  app.get("/api/preferences", (_req, res) => res.json({ premiumPurchased }));
+  app.patch("/api/preferences", (req, res) => {
+    premiumPurchased = req.body.premiumPurchased;
+    res.json({ premiumPurchased });
+  });
+  const backend = createServer(app);
+  backend.listen(0, "127.0.0.1");
+  await once(backend, "listening");
+  port = (backend.address() as { port: number }).port;
+  const mcpKey = "a".repeat(64),
+    webKey = "b".repeat(64);
+  const gateway = await startGateway(port, localToken, mcpKey, webKey);
+  try {
+    for (const path of [
+      "/",
+      "/api/preferences",
+      "/_next/static/fixture.js",
+      `/app/${mcpKey}`,
+      `/mcp/${webKey}`,
+    ]) {
+      assert.equal(
+        (
+          await fetch(gateway.url + path, {
+            headers: { Authorization: `Bearer ${localToken}` },
+          })
+        ).status,
+        404,
+      );
+    }
+    const entry = await fetch(`${gateway.url}/app/${webKey}`, {
+      redirect: "manual",
+    });
+    assert.equal(entry.status, 303);
+    assert.equal(entry.headers.get("location"), "/");
+    assert.equal(entry.headers.get("referrer-policy"), "no-referrer");
+    const cookie = entry.headers.get("set-cookie")!;
+    for (const flag of ["Secure", "HttpOnly", "SameSite=Lax", "Path=/"])
+      assert(cookie.includes(flag));
+    const headers = { Cookie: cookie.split(";")[0] };
+    assert.equal((await fetch(gateway.url + "/", { headers })).status, 200);
+    assert.equal(
+      (
+        await fetch(gateway.url + "/_next/static/fixture.js?cache=fixture", {
+          headers,
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await (
+          await fetch(gateway.url + "/api/preferences", { headers })
+        ).json()
+      ).premiumPurchased,
+      true,
+    );
+    for (const extra of [
+      { Origin: "https://evil.invalid", "Sec-Fetch-Site": "same-origin" },
+      { Origin: "null", "Sec-Fetch-Site": "same-origin" },
+      { Origin: gateway.url, "Sec-Fetch-Site": "cross-site" },
+    ]) {
+      const blocked = await fetch(gateway.url + "/api/preferences", {
+        method: "PATCH",
+        headers: { ...headers, ...extra, "Content-Type": "application/json" },
+        body: JSON.stringify({ premiumPurchased: false }),
+      });
+      assert.equal(blocked.status, 403);
+    }
+    assert.equal(premiumPurchased, true);
+    const updated = await fetch(gateway.url + "/api/preferences", {
+      method: "PATCH",
+      headers: {
+        ...headers,
+        Origin: gateway.url,
+        "Sec-Fetch-Site": "same-origin",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ premiumPurchased: false }),
+    });
+    assert.equal(updated.status, 200);
+    assert.equal((await updated.json()).premiumPurchased, false);
+    assert.equal(updated.headers.get("cache-control"), "no-store");
+    assert.equal(
+      (
+        await fetch(gateway.url + "/", {
+          headers: { Cookie: "__Host-practica_web=wrong" },
+        })
+      ).status,
+      404,
+    );
+  } finally {
+    gateway.server.closeAllConnections();
+    backend.closeAllConnections();
+    await Promise.all([
+      new Promise<void>((resolve) => gateway.server.close(() => resolve())),
+      new Promise<void>((resolve) => backend.close(() => resolve())),
+    ]);
+  }
+});
+
 test("Cloudflare connection lifecycle updates the public URL and copied instruction without leaking local URLs", async () => {
   const child = new EventEmitter() as ChildProcess;
   const stdout = new PassThrough();
@@ -159,17 +277,27 @@ test("Cloudflare connection lifecycle updates the public URL and copied instruct
       status.chatgptUrl!,
       /^https:\/\/practice-fixture\.trycloudflare\.com\/mcp\/[a-f0-9]{64}$/,
     );
+    assert.match(
+      status.webUrl!,
+      /^https:\/\/practice-fixture\.trycloudflare\.com\/app\/[a-f0-9]{64}$/,
+    );
+    assert.notEqual(
+      status.webUrl!.split("/").at(-1),
+      status.chatgptUrl!.split("/").at(-1),
+    );
     const api = new ApiController({} as StudyService, tunnel);
     const details = api.connection({
       headers: { host: "localhost:3000" },
     } as Request);
     assert.equal(details.chatgptUrl, status.chatgptUrl);
+    assert.equal(details.webUrl, status.webUrl);
     assert(details.prompt?.includes(status.chatgptUrl!));
     assert(details.prompt?.includes(`Authorization: Bearer ${localToken}`));
     assert(!/http:\/\/(?:localhost|127\.0\.0\.1)/.test(details.prompt!));
     assert(!details.prompt?.includes("OpenAI Platform browser"));
     child.emit("exit", 1);
     assert.equal(tunnel.status().status, "error");
+    assert.equal(tunnel.status().webUrl, null);
     assert.equal(
       api.connection({ headers: { host: "localhost:3000" } } as Request).prompt,
       null,

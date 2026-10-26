@@ -119,6 +119,10 @@ test("manual sections preserve access restrictions and extract rules, tables and
   assert.equal(sections.length, 2);
   assert.equal(sections[0].id, "13");
   assert.equal(sections[0].title, "Speed");
+  assert.equal(
+    sections[0].fullUrl,
+    "https://practicatest.com/en/book-theory-driving-test/speed/13/full",
+  );
   assert.equal(sections[1].testUrl, null);
   assert.equal(sections[1].fullUrl, null);
   assert.throws(() => manualUrl("https://practicatest.com/en/register"));
@@ -159,7 +163,7 @@ test("section selection retrieves rules and topic exams without falling back to 
     assert.equal(run.language, "en");
     await assert.rejects(
       () => study.list("B", undefined, "en", "14"),
-      /Premium/,
+      /topic-test link/,
     );
     await assert.rejects(
       () => study.rules("B", "en", "14", "full"),
@@ -443,6 +447,12 @@ test("official MCP client can discover tools, get questions and submit answers",
     assert(!JSON.stringify(signedIn).includes("fixture@example.invalid"));
     assert(!JSON.stringify(signedIn).includes("dummy-test-password"));
     assert.equal((await call("session_status", {})).authenticated, true);
+    const access = await call("check_account_access", {
+      permit: "B",
+      language: "en",
+    });
+    assert.equal(access.accountAccess.topicTestCount, 1);
+    assert.equal(access.accountAccess.premiumAccess, "not_confirmed");
     const run = await call("start_test", {
       url: "https://practicatest.com/tests/permiso-B/online",
     });

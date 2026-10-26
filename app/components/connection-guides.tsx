@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const practicePrompt = `Use the PracticaTest MCP tools. First call session_status. If I am signed out, ask me to sign in using the local app, CLI or MCP login. For this active session, use permit B and language en. Offer a general test or a section-specific test, and retrieve section rules when requested. Ask one question at a time. After my answer, call submit_answer once and show its feedback and nextQuestion immediately. Fetch the website explanation only if I ask for it. Do not call finish_test unless I explicitly ask to submit.`;
+const practicePrompt = `Use the PracticaTest MCP tools. First call session_status and check_account_access for permit B and language en. If I am signed out, ask me to sign in using the local app, CLI or MCP login. For this active session, use permit B and language en. Offer a general test or a section-specific test, and retrieve section rules when requested. Ask one question at a time. After my answer, call submit_answer once and show its feedback and nextQuestion immediately. Fetch the website explanation only if I ask for it. Do not call finish_test unless I explicitly ask to submit.`;
 
 export function ConnectionGuides({
   publicUrl,

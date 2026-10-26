@@ -1,7 +1,11 @@
-import { CookieJar } from "tough-cookie";
+import { CookieJar, type SerializedCookieJar } from "tough-cookie";
 import { load } from "cheerio";
 import { AppError } from "../server/errors.js";
-import type { Permit, SessionStatus } from "../shared/contracts.js";
+import type {
+  AccountAccess,
+  Permit,
+  SessionStatus,
+} from "../shared/contracts.js";
 import {
   csrfToken,
   isAuthenticated,
@@ -13,20 +17,49 @@ import {
   type ParsedTest,
 } from "./parser.js";
 import { parseRules, parseSections } from "./manual.js";
+import { SessionStore } from "./session-store.js";
 
 export class PracticaTest {
   private jar = new CookieJar();
   private csrf = "";
-  private expires = 0;
-  private readonly lifetime = 2 * 60 * 60 * 1000;
+  private authenticated = false;
+  private verifiedAt: string | null = null;
+  private access = new Map<string, AccountAccess>();
   private tracking = new Map<string, string>();
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
-
+  constructor(
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly sessionStore?: SessionStore,
+  ) {
+    const saved = sessionStore?.load();
+    if (saved) {
+      try {
+        this.jar = CookieJar.deserializeSync(saved.jar as SerializedCookieJar);
+        this.csrf = saved.csrf;
+        this.verifiedAt = saved.verifiedAt;
+        this.tracking = new Map(Object.entries(saved.tracking));
+        this.authenticated = true;
+      } catch {
+        this.logout();
+      }
+    }
+  }
+  private persist() {
+    if (!this.authenticated || !this.verifiedAt) return;
+    this.sessionStore?.save({
+      version: 1,
+      jar: this.jar.serializeSync(),
+      csrf: this.csrf,
+      verifiedAt: this.verifiedAt,
+      tracking: Object.fromEntries(this.tracking),
+    });
+  }
   status(): SessionStatus {
-    if (this.expires && Date.now() >= this.expires) this.logout();
     return {
-      authenticated: this.expires > Date.now(),
-      expiresAt: this.expires ? new Date(this.expires).toISOString() : null,
+      authenticated: this.authenticated,
+      expiresAt: null,
+      remembered: Boolean(this.sessionStore?.enabled && this.authenticated),
+      lastVerifiedAt: this.verifiedAt,
+      access: [...this.access.values()],
     };
   }
   requireSession() {
@@ -37,11 +70,20 @@ export class PracticaTest {
         "Sign in to PracticaTest using the MCP login tool, npm run login, or the optional local web interface.",
       );
   }
-  logout() {
+  private resetMemory() {
     this.jar = new CookieJar();
     this.csrf = "";
-    this.expires = 0;
+    this.authenticated = false;
+    this.verifiedAt = null;
     this.tracking.clear();
+    this.access.clear();
+  }
+  logout() {
+    this.resetMemory();
+    this.sessionStore?.clear();
+  }
+  dispose() {
+    this.resetMemory();
   }
 
   private async request(
@@ -81,8 +123,9 @@ export class PracticaTest {
           "PracticaTest is unreachable. Check your connection and try again.",
         );
       }
-      for (const value of response.headers.getSetCookie())
-        await this.jar.setCookie(value, url.href);
+      const cookies = response.headers.getSetCookie();
+      for (const value of cookies) await this.jar.setCookie(value, url.href);
+      if (cookies.length) this.persist();
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         const location = response.headers.get("location");
         if (!location) break;
@@ -113,6 +156,7 @@ export class PracticaTest {
       const text = await response.text();
       const token = csrfToken(text);
       if (token) this.csrf = token;
+      if (token || cookies.length) this.persist();
       return text;
     }
     throw new AppError(
@@ -159,7 +203,9 @@ export class PracticaTest {
           "LOGIN_UNVERIFIED",
           "The website did not confirm authentication.",
         );
-      this.expires = Date.now() + this.lifetime;
+      this.authenticated = true;
+      this.verifiedAt = new Date().toISOString();
+      this.persist();
       return this.status();
     } catch (error) {
       this.logout();
@@ -177,6 +223,8 @@ export class PracticaTest {
         "Your website session has expired. Sign in again.",
       );
     }
+    this.verifiedAt = new Date().toISOString();
+    this.persist();
     return html;
   }
   async list(
@@ -196,8 +244,8 @@ export class PracticaTest {
       if (!section.testUrl)
         throw new AppError(
           403,
-          "SECTION_TEST_PREMIUM_REQUIRED",
-          "PracticaTest does not provide a test link for this section to your account. A Premium subscription may be required.",
+          "SECTION_TEST_UNAVAILABLE",
+          "No accessible topic-test link was exposed for this section in the current website response. Refresh account access or sign in again. This alone does not determine whether your subscription is paid.",
         );
       return [{ title: section.title, url: section.testUrl }];
     }
@@ -228,12 +276,37 @@ export class PracticaTest {
       language === "en"
         ? `${SITE}/en/book-theory-driving-test`
         : `${SITE}/temario/${permit === "puntos" ? "recuperacion-puntos" : `permiso-${permit}`}`;
-    return parseSections(
+    const sections = parseSections(
       await this.authenticatedPage(path),
       path,
       permit,
       language,
     );
+    this.access.set(`${permit}:${language}`, {
+      permit,
+      language,
+      checkedAt: new Date().toISOString(),
+      sectionCount: sections.length,
+      topicTestCount: sections.filter((section) => section.testUrl).length,
+      fullRulesCount: sections.filter((section) => section.fullUrl).length,
+      generalTestLinkCount: null,
+      premiumAccess:
+        sections.length > 1 && sections.every((section) => section.testUrl)
+          ? "available"
+          : "not_confirmed",
+    });
+    return sections;
+  }
+  async checkAccountAccess(permit: Permit = "B", language: "en" | "es" = "en") {
+    await this.sections(permit, language);
+    const tests = await this.list(permit, undefined, language);
+    const access = {
+      ...this.access.get(`${permit}:${language}`)!,
+      generalTestLinkCount: tests.length,
+      checkedAt: new Date().toISOString(),
+    };
+    this.access.set(`${permit}:${language}`, access);
+    return { ...this.status(), accountAccess: access };
   }
   private async section(permit: Permit, language: "en" | "es", id: string) {
     const section = (await this.sections(permit, language)).find(
@@ -258,13 +331,14 @@ export class PracticaTest {
     if (!url)
       throw new AppError(
         403,
-        "SECTION_RULES_PREMIUM_REQUIRED",
-        "The full section is not available to this account. Request its summary or check your Premium subscription.",
+        "SECTION_RULES_UNAVAILABLE",
+        "The full section has no supported link in the current website response. Refresh account access or sign in again. Other Premium features may still be available.",
       );
     return parseRules(await this.authenticatedPage(url), section, url, mode);
   }
   remember(runId: string, tracking: string) {
     this.tracking.set(runId, tracking);
+    this.persist();
   }
   async image(url: string, signal?: AbortSignal) {
     this.requireSession();
@@ -374,6 +448,7 @@ export class PracticaTest {
         "The website rejected the result. Check it on PracticaTest.",
       );
     this.tracking.delete(runId);
+    this.persist();
     // The site returns no stable public result schema. Never return its raw response or tokens.
     return { accepted: true };
   }

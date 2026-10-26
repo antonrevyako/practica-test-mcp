@@ -21,7 +21,9 @@ try {
       if (!session.authenticated)
         throw new Error("The website did not confirm authentication.");
       console.log(
-        `Signed in. MCP clients can use this session until ${session.expiresAt}.`,
+        session.remembered
+          ? "Signed in. The session is remembered across restarts; PracticaTest may still expire it."
+          : "Signed in. This session is kept in memory only.",
       );
     } finally {
       email = "";
@@ -29,12 +31,16 @@ try {
     }
   } else if (command === "logout") {
     await localApi(target, "session", { method: "DELETE" });
-    console.log("Signed out. The in-memory website session has been cleared.");
+    console.log(
+      "Signed out. The website session and its remembered local copy have been cleared.",
+    );
   } else if (command === "status") {
     const session = await localApi(target, "session");
     console.log(
       session.authenticated
-        ? `Signed in until ${session.expiresAt}.`
+        ? session.remembered
+          ? "Signed in. Session is remembered across restarts."
+          : "Signed in. Session is kept in memory only."
         : "Signed out. Run npm run login.",
     );
   } else throw new Error("Use login, logout or status.");

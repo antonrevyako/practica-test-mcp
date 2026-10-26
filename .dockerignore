@@ -18,3 +18,11 @@ coverage
 *.pfx
 *.log
 .DS_Store
+
+# Generated workspace state, including custom database locations
+session.enc
+session.enc.*.tmp
+session.key
+workspace.json
+workspace.json.*.tmp
+/images/

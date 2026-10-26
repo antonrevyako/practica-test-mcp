@@ -10,7 +10,7 @@ export const fixture = `${home}<title>Test de práctica</title><h1>Test de prác
 export const manualFixture = `${home}<div class="box_chapter"><div class="title-box">3. Speed</div>
 <a href="/en/spanish-driving-test/online?section=13">Test</a>
 <a href="/en/book-theory-driving-test/speed/13">Summary</a>
-<a href="/en/book-theory-driving-test/speed/13?full=1">Read Full</a></div>
+<a href="/en/book-theory-driving-test/speed/13/full">Read Full</a></div>
 <div class="box_chapter"><div class="title-box">4. Manoeuvres</div><a href="/en/our-plans">Test (Premium)</a>
 <a href="/en/book-theory-driving-test/manoeuvres/14">Summary</a><a href="/en/our-plans">Read Full (Premium)</a></div>`;
 export const rulesFixture = `${home}<nav>Unrelated navigation</nav><h1>Chapter 3: Speed</h1>

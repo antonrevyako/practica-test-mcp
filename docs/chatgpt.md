@@ -16,7 +16,7 @@ The ChatGPT URL includes a private access key. Anyone with that full URL can use
 
 Clients that support request headers can use the public `/mcp` endpoint with `Authorization: Bearer <local MCP token>` instead. This alternative appears in the copyable configuration. The prompt includes both connection forms, but never your PracticaTest password.
 
-Only MCP requests cross the public gateway. The web interface, `/api/connection`, login form and other administrative API routes remain local, even when a valid MCP key is supplied. The gateway adds local authorization while forwarding MCP and does not log request paths or tokens. Tokens and connection URLs are kept in process memory; connection responses use `Cache-Control: no-store`.
+MCP credentials authorize only MCP requests. The web interface, `/api/connection`, login form and other administrative API routes require the separate private interface link and browser session cookie; a valid MCP key alone cannot reach them. The gateway adds local authorization while forwarding MCP and does not log request paths or tokens. Tokens and connection URLs are kept in process memory; connection responses use `Cache-Control: no-store`.
 
 The app uses Streamable HTTP with JSON responses. Cloudflare Quick Tunnels do not support SSE, so no long-lived event stream is required.
 
@@ -51,7 +51,7 @@ For a custom port, use `PORT=3210 npm start` and `npm run chatgpt:prompt -- --po
 - CLI: run `npm run login` in a second terminal. Both fields use hidden input. Use `npm run session` to check and `npm run logout` to clear the session. Set `PRACTICA_URL=http://127.0.0.1:3210` for a custom port.
 - Web: use the existing sign-in form.
 
-All three methods use the same in-memory session. Restarting or reaching its two-hour limit requires signing in again.
+All three methods share the same remembered session. Its cookies and CSRF state are encrypted beside the database, while the login email and password are never saved. Restarting restores the session; explicit sign-out or expiration by PracticaTest requires signing in again. Set `PERSIST_SESSION=false` for memory-only sign-in.
 
 ## Docker
 
@@ -59,7 +59,7 @@ All three methods use the same in-memory session. Restarting or reaching its two
 docker compose up --build -d
 ```
 
-The image includes the official Cloudflare connector. The local UI and API bind to loopback on the host, while the connector opens an outbound tunnel to the MCP-only gateway. To omit the interface:
+The image includes the official Cloudflare connector. The local UI and API bind to loopback on the host, while the connector opens an outbound tunnel to the authenticated gateway. To omit the interface:
 
 ```sh
 docker compose -f compose.yaml -f compose.mcp.yaml up --build -d
@@ -80,3 +80,7 @@ Automated tests check public-gateway authorization, blocked administrative route
 ## Fast answer feedback
 
 `submit_answer` checks the saved answer key locally. It returns correctness, correct options, `progress` and `nextQuestion` in a single response. The assistant should display the feedback immediately and use that next question directly. Additional `get_test` and `next_question` calls are unnecessary for the same turn. `get_explanation` makes a separate PracticaTest request; use it when the learner asks for the website explanation.
+
+## Private browser interface
+
+The MCP page also shows **Copy private interface URL** and **Open interface**. Use that separate `/app/<private-key>` URL to open the web interface from your phone. It sets a Secure, HttpOnly browser cookie and redirects to `/`, removing the entry key from the address bar. Cross-site writes are rejected. The link grants access to the interface and account controls, so keep it private. It is regenerated after restart and is unavailable in MCP-only mode.

@@ -26,7 +26,7 @@ docker compose logs --tail=50 practica
 docker compose down
 ```
 
-Questions, answer history and downloaded images remain in the `practica-data` named volume when the container stops or is recreated. The container runs as the `node` user and publishes the UI and API on host loopback only. Restarting clears the in-memory login and creates a new temporary Cloudflare URL; sign in again and update the MCP client with the new URL.
+Questions, answer history and downloaded images remain in the `practica-data` named volume when the container stops or is recreated. The container runs as the `node` user and publishes the UI and API on host loopback only. The website login is remembered across restarts. A restart creates a new temporary Cloudflare URL; update the MCP client with that new URL. PracticaTest can still expire or revoke its session.
 
 If port 3000 is occupied, start on another port (macOS/Linux):
 
@@ -48,6 +48,55 @@ docker compose exec practica npm run chatgpt:prompt
 
 This mode serves MCP and the local administrative API without loading Next.js. The last command prints the current public connection instruction once the tunnel is ready. Stop it with `docker compose -f compose.yaml -f compose.mcp.yaml down`.
 
+### Keep data in a host folder
+
+The default Compose file already keeps data in a named Docker volume outside the container's writable filesystem. To choose a visible directory on your computer instead, add `compose.storage.yaml`:
+
+```sh
+mkdir -p ../practica-test-data
+PRACTICA_UID="$(id -u)" PRACTICA_GID="$(id -g)" docker compose -f compose.yaml -f compose.storage.yaml up --build -d
+```
+
+On macOS/Linux, the UID/GID settings make the app write files as your host user. Use the same settings when recreating the container. On Windows, create the folder and run `docker compose -f compose.yaml -f compose.storage.yaml up --build -d` in Docker Desktop.
+
+By default this stores data in `../practica-test-data`, next to the repository. To choose another directory on macOS/Linux:
+
+```sh
+mkdir -p /absolute/path/practica-data
+PRACTICA_DATA_DIR=/absolute/path/practica-data PRACTICA_UID="$(id -u)" PRACTICA_GID="$(id -g)" docker compose -f compose.yaml -f compose.storage.yaml up --build -d
+```
+
+On PowerShell, set `$env:PRACTICA_DATA_DIR = "C:\practica-data"` before the same Compose command. The directory contains:
+
+| Path              | Contents                                                          |
+| ----------------- | ----------------------------------------------------------------- |
+| `practica.sqlite` | Questions, tests, answer events and statistics                    |
+| `images/`         | Downloaded question illustrations                                 |
+| `workspace.json`  | Local interface preferences, including the purchase marker        |
+| `session.enc`     | Encrypted website cookies, CSRF state and active-attempt tracking |
+| `session.key`     | Local encryption key, restricted to the application user          |
+
+The folder is mounted at `/app/data` inside the container. Recreating or removing a container preserves these host files. To use host storage without the web interface, combine all three files:
+
+```sh
+PRACTICA_UID="$(id -u)" PRACTICA_GID="$(id -g)" docker compose -f compose.yaml -f compose.mcp.yaml -f compose.storage.yaml up --build -d
+```
+
+Stop the host-storage installation with `docker compose -f compose.yaml -f compose.storage.yaml down` (include `compose.mcp.yaml` too if you used it).
+
+#### Move existing Docker data to the host folder
+
+Stop the old container before copying SQLite, then copy its data and start with the storage override:
+
+```sh
+docker compose stop
+mkdir -p ../practica-test-data
+docker compose cp practica:/app/data/. ../practica-test-data/
+PRACTICA_UID="$(id -u)" PRACTICA_GID="$(id -g)" docker compose -f compose.yaml -f compose.storage.yaml up --build -d
+```
+
+This keeps the original named volume as well as the copied host data. Do not run two app instances against the same database and session directory at the same time.
+
 ## Start without Docker
 
 Install **Node.js 22.13 or newer** and npm. The Docker image and application have been tested with Node.js 24. Clone or download this repository and run these commands from its root directory:
@@ -67,7 +116,7 @@ npm run login
 npm run session
 ```
 
-Stop the application with **Ctrl+C**. SQLite migrations run automatically, and the database is created at `data/practica.sqlite`. Question images are saved in `data/images/`. These files remain after stopping, while the login session and temporary public connection URL are renewed on the next launch.
+Stop the application with **Ctrl+C**. SQLite migrations run automatically, and the database is created at `data/practica.sqlite`. Question images are saved in `data/images/`. These files and the encrypted website session remain after stopping. The website session is restored on the next launch; the temporary public connection URL is generated again.
 
 If `better-sqlite3` has no prebuilt binary for your platform, installation needs Python 3 and C++ build tools: Xcode Command Line Tools on macOS, or `python3 make g++` on Debian/Ubuntu. The Docker build already includes them.
 
@@ -107,9 +156,17 @@ npm run chatgpt:prompt
 
 The **MCP connection** page shows the current Cloudflare HTTPS URL with **Copy public server URL** and **Copy setup prompt with token** buttons. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
 
-For ChatGPT, add the full public Server URL and choose **No authentication**: the URL already includes a private access key verified by this app. Claude Desktop can use the same public URL, or the generated local stdio configuration when this app runs natively on the same computer. The web interface and administrative API remain local.
+For ChatGPT, add the full public Server URL and choose **No authentication**: the URL already includes a private access key verified by this app. Claude Desktop can use the same public URL, or the generated local stdio configuration when this app runs natively on the same computer. The MCP connection cannot access web or administrative routes. Remote browser access uses the separate private interface link described below.
 
 Keep the app running while practising. The temporary URL changes after restarting; copy the new link and update your client. See [ChatGPT setup and authentication](docs/chatgpt.md) and [Claude Desktop setup](docs/claude-desktop.md).
+
+## Open the interface away from your computer
+
+On **MCP connection**, wait for Cloudflare to become ready. Under **Private web interface**, use **Copy private interface URL** or **Open interface**. Open that complete link on your phone or another device to use the same practice interface, saved history and connected account.
+
+The web link differs from the MCP server URL. A URL ending in `/mcp/...` is for ChatGPT or Claude and does not display a web page. The browser link ends in `/app/<private-key>`; opening it establishes a protected browser session and redirects to the interface. Keep it private: it grants access to the app and its account controls. The browser key is separate from the MCP key, so an MCP connection cannot unlock administrative routes.
+
+Keep the computer or container running. Browser links change when the app or tunnel restarts. MCP-only mode does not provide a remote interface link.
 
 ## MCP connection
 
@@ -146,24 +203,25 @@ For clients that only support stdio, use the bridge to the same running app:
 }
 ```
 
-The stdio bridge pairs with the local daemon automatically; setting MCP_TOKEN is optional. It can also connect to the Docker app: run it on the host from this checkout after `npm ci`. The UI and MCP clients share the same in-memory login session and local history.
+The stdio bridge pairs with the local daemon automatically; setting MCP_TOKEN is optional. It can also connect to the Docker app: run it on the host from this checkout after `npm ci`. The UI and MCP clients share the same remembered website session and local history.
 
-| Tool                 | Purpose                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`              | Sign in with email/password supplied through MCP; credentials are not saved by the app                                                                                          |
-| `logout`             | Clear the shared website session                                                                                                                                                |
-| `session_status`     | Check authentication                                                                                                                                                            |
-| `list_tests`         | List accessible exam links; `language=en` (default) selects English category B exams; `language=es` selects Spanish; `sectionId` selects topic exams; omit it for general exams |
-| `start_test`         | Open an exam using exactly one of `url` or `sectionId`, create an attempt and return its `runId`                                                                                |
-| `list_sections`      | Discover section IDs, titles, rules and topic-test availability                                                                                                                 |
-| `get_section_rules`  | Fetch rules for `sectionId`, with text, headings, image URLs and tables; `mode=summary` or `full`                                                                               |
-| `get_test`           | Retrieve questions and progress                                                                                                                                                 |
-| `next_question`      | Retrieve the first unanswered question                                                                                                                                          |
-| `submit_answer`      | Accept `runId`, `questionId` and `optionIds`; grade and save locally                                                                                                            |
-| `get_question_image` | Return an illustration as MCP image content for vision-capable clients                                                                                                          |
-| `get_explanation`    | Fetch the website explanation after answering                                                                                                                                   |
-| `finish_test`        | Submit a completed exam to PracticaTest and update website statistics                                                                                                           |
-| `list_attempts`      | List local attempts and scores                                                                                                                                                  |
+| Tool                   | Purpose                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`                | Sign in with email/password supplied through MCP; credentials are not saved by the app                                                                                          |
+| `logout`               | Clear the shared website session                                                                                                                                                |
+| `check_account_access` | Refresh actual website access for the selected language and category                                                                                                            |
+| `session_status`       | Check authentication                                                                                                                                                            |
+| `list_tests`           | List accessible exam links; `language=en` (default) selects English category B exams; `language=es` selects Spanish; `sectionId` selects topic exams; omit it for general exams |
+| `start_test`           | Open an exam using exactly one of `url` or `sectionId`, create an attempt and return its `runId`                                                                                |
+| `list_sections`        | Discover section IDs, titles, rules and topic-test availability                                                                                                                 |
+| `get_section_rules`    | Fetch rules for `sectionId`, with text, headings, image URLs and tables; `mode=summary` or `full`                                                                               |
+| `get_test`             | Retrieve questions and progress                                                                                                                                                 |
+| `next_question`        | Retrieve the first unanswered question                                                                                                                                          |
+| `submit_answer`        | Accept `runId`, `questionId` and `optionIds`; grade and save locally                                                                                                            |
+| `get_question_image`   | Return an illustration as MCP image content for vision-capable clients                                                                                                          |
+| `get_explanation`      | Fetch the website explanation after answering                                                                                                                                   |
+| `finish_test`          | Submit a completed exam to PracticaTest and update website statistics                                                                                                           |
+| `list_attempts`        | List local attempts and scores                                                                                                                                                  |
 
 Example prompt: “Find an English category B test in Spain, open today's exam and ask one question at a time. Wait for my answer, then explain mistakes. Submit the result to the website when I ask.”
 
@@ -202,26 +260,41 @@ Additional MCP tools work directly with this local archive, including while sign
 
 Filter statistics by `permit`, `language`, `runId`, `questionKey` and ISO `from`/`to` dates. Question content is identified independently of option letters, so shuffled options can be grouped across attempts. Correct options remain hidden for unanswered questions. Existing attempts are imported automatically; only their last saved choices can be recovered from the older database. See [statistics, persistence and image caching](docs/statistics.md).
 
+## Remembered sign-in and subscription access
+
+Sign in once through the interface, the MCP `login` tool or `npm run login`. By default, the app saves an AES-256-GCM-encrypted website session next to the database and restores it after app or container restarts. The login email and password are never saved. There is no artificial two-hour logout timer. PracticaTest can still expire or revoke its cookies; a rejected or expired website session is cleared and requires signing in again.
+
+`npm run logout`, the interface's **Sign out** action and the MCP `logout` tool delete both the remembered session and its local encryption key. Stopping the app preserves them. The session, key, database and images belong to the same data directory, so keep that folder private and include it when moving the installation. Set `PERSIST_SESSION=false` to use memory-only sign-in instead.
+
+After buying or changing a subscription, use **Refresh account access** in the interface or MCP `check_account_access` with `permit=B` and `language=en`. This rechecks the website's actual section and exam links. Access is scoped to the selected language and licence category. A missing full-text link does not mean all Premium features are unavailable, and the local purchase checkbox does not grant website permissions.
+
+## Premium purchase marker
+
+The Practice sidebar includes a **Premium purchased** checkbox. It adds a gold badge beside the connection status and saves this local workspace preference beside the database in `workspace.json`. This marker records the user's purchase; actual subscription permissions continue to come from PracticaTest. It contains no account identifier or credentials and persists in the default Docker data volume.
+
 ## Data and authentication
 
 - Email and password are forwarded to PracticaTest over HTTPS. They are never saved to SQLite, files or application logs.
-- Cookies and CSRF tokens stay in process memory. Sign-out, restart or a two-hour expiry clears the local session. The website session may expire earlier.
-- SQLite stores parsed questions, exact option order, exam identifiers and append-only answer events. Downloaded question images are saved beside the database in an `images/` directory. Full HTML and session parameters are not persisted. `data/`, databases and `.env*` files are excluded from Git and the Docker context.
+- Cookies, CSRF state and active-attempt tracking are kept in encrypted local session storage by default. Explicit sign-out or website expiration clears the saved session. `PERSIST_SESSION=false` disables restoring and saving it.
+- SQLite stores parsed questions, exact option order, exam identifiers and append-only answer events. Downloaded question images are saved beside the database in an `images/` directory. Full HTML and session parameters are not stored in SQLite. Remembered website state is stored separately in encrypted session files. `data/`, databases and `.env*` files are excluded from Git and the Docker context.
 - This is a single-user app for a trusted local machine. History belongs to the local workspace and remains after sign-out. Archive statistics and saved images can still be read through authenticated MCP while signed out. There is no multi-user isolation.
-- Local HTTP MCP requires a Bearer token. The Cloudflare gateway accepts the public MCP endpoint with that token or the key-protected ChatGPT URL, and blocks all UI and administrative routes.
+- Local HTTP MCP requires a Bearer token. The Cloudflare gateway accepts the public MCP endpoint with that token or the key-protected ChatGPT URL. Web and administrative routes require the separate private browser link and its Secure, HttpOnly cookie; MCP credentials alone cannot access them.
 - Access follows the permissions and subscription of your account. Website limits still apply. HTML changes may require adapter updates. CAPTCHA bypass is not implemented.
 
 ## Configuration
 
-| Variable           | Default                     | Purpose                                                                         |
-| ------------------ | --------------------------- | ------------------------------------------------------------------------------- |
-| `PORT`             | `3000`                      | Shared UI, API and MCP port                                                     |
-| `HOST`             | `127.0.0.1`                 | Listen address; Docker uses `0.0.0.0`                                           |
-| `DATABASE_PATH`    | `./data/practica.sqlite`    | SQLite path                                                                     |
-| `MCP_TOKEN`        | Random at startup           | Optional persistent local MCP token                                             |
-| `TUNNEL_ENABLED`   | `true`                      | Automatically start the Cloudflare Quick Tunnel; set `false` for local-only use |
-| `CLOUDFLARED_PATH` | Auto-detected or downloaded | Optional path to the Cloudflare connector                                       |
-| `PRACTICA_URL`     | Local endpoint              | App address for the stdio bridge and live check                                 |
+| Variable                        | Default                     | Purpose                                                                          |
+| ------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `PORT`                          | `3000`                      | Shared UI, API and MCP port                                                      |
+| `HOST`                          | `127.0.0.1`                 | Listen address; Docker uses `0.0.0.0`                                            |
+| `DATABASE_PATH`                 | `./data/practica.sqlite`    | SQLite path                                                                      |
+| `MCP_TOKEN`                     | Random at startup           | Optional persistent local MCP token                                              |
+| `PERSIST_SESSION`               | `true`                      | Remember the encrypted website session across restarts; `false` uses memory only |
+| `PRACTICA_DATA_DIR`             | `../practica-test-data`     | Host data folder when using `compose.storage.yaml`                               |
+| `PRACTICA_UID` / `PRACTICA_GID` | `1000` / `1000`             | Container user IDs for the host-storage override                                 |
+| `TUNNEL_ENABLED`                | `true`                      | Automatically start the Cloudflare Quick Tunnel; set `false` for local-only use  |
+| `CLOUDFLARED_PATH`              | Auto-detected or downloaded | Optional path to the Cloudflare connector                                        |
+| `PRACTICA_URL`                  | Local endpoint              | App address for the stdio bridge and live check                                  |
 
 Run commands from the project root. With a custom port, open `http://localhost:<PORT>`. For example, use `PORT=3210 npm start` or `PORT=3210 docker compose up --build -d` if port 3000 is already occupied.
 

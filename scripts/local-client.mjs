@@ -1,5 +1,6 @@
 export function localEndpoint(
-  value = process.env.PRACTICA_URL ?? "http://127.0.0.1:3000",
+  value = process.env.PRACTICA_URL ??
+    `http://127.0.0.1:${process.env.PORT ?? 3000}`,
 ) {
   let url;
   try {

@@ -9,6 +9,7 @@ import type {
   ManualSection,
   SectionRules,
   ConnectionInfo,
+  WorkspacePreferences,
 } from "../src/shared/contracts";
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -70,6 +71,9 @@ function Road() {
 export default function Home() {
   const [session, setSession] = useState<SessionStatus | null>(null);
   const [tab, setTab] = useState<Tab>("practice");
+  const [preferences, setPreferences] = useState<WorkspacePreferences | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [permit, setPermit] = useState("B");
@@ -89,6 +93,8 @@ export default function Home() {
   const [promptCopied, setPromptCopied] = useState(false);
   const [publicUrl, setPublicUrl] = useState("");
   const [chatgptUrl, setChatgptUrl] = useState("");
+  const [webUrl, setWebUrl] = useState("");
+  const [webUrlCopied, setWebUrlCopied] = useState(false);
   const [tunnel, setTunnel] = useState<ConnectionInfo["tunnel"] | null>(null);
   const [urlCopied, setUrlCopied] = useState(false);
   const [claudeDesktopConfig, setClaudeDesktopConfig] = useState<string | null>(
@@ -100,6 +106,7 @@ export default function Home() {
     setSetupPrompt(connection.prompt ?? "");
     setPublicUrl(connection.publicUrl ?? "");
     setChatgptUrl(connection.chatgptUrl ?? "");
+    setWebUrl(connection.webUrl ?? "");
     setTunnel(connection.tunnel);
     setClaudeDesktopConfig(connection.claudeDesktopConfig);
   }
@@ -121,12 +128,16 @@ export default function Home() {
   useEffect(() => {
     setPromptCopied(false);
     setUrlCopied(false);
+    setWebUrlCopied(false);
     setCopied(false);
   }, [setupPrompt]);
 
   useEffect(() => {
     api<SessionStatus>("session")
       .then(setSession)
+      .catch((e) => setError(e.message));
+    api<WorkspacePreferences>("preferences")
+      .then(setPreferences)
       .catch((e) => setError(e.message));
     if (new URLSearchParams(window.location.search).get("tab") === "mcp") {
       void switchTab("mcp");
@@ -140,7 +151,14 @@ export default function Home() {
     let active = true;
     void api<ManualSection[]>(`sections?permit=${permit}&language=${language}`)
       .then((next) => {
-        if (active) setSections(next);
+        if (active) {
+          setSections(next);
+          void api<SessionStatus>("session")
+            .then((status) => {
+              if (active) setSession(status);
+            })
+            .catch(() => {});
+        }
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -261,6 +279,13 @@ export default function Home() {
     2,
   );
 
+  const verifiedPremium =
+    session?.access?.some(
+      (access) =>
+        access.permit === permit &&
+        access.language === language &&
+        access.premiumAccess === "available",
+    ) ?? false;
   return (
     <div className="shell">
       <header className="header">
@@ -316,16 +341,33 @@ export default function Home() {
               MCP connection <span className="mini-tag">AI</span>
             </button>
           </nav>
-          <span
-            className={`status ${session?.authenticated ? "connected" : ""}`}
-          >
-            <span className="dot" />
-            {session === null
-              ? "Connecting…"
-              : session.authenticated
-                ? "PracticaTest connected"
-                : "Not connected"}
-          </span>
+          <div className="toolbar-account">
+            {(verifiedPremium || preferences?.premiumPurchased) && (
+              <span
+                className="premium-badge"
+                title={
+                  verifiedPremium
+                    ? "Topic-test access confirmed by PracticaTest for the selected language and category"
+                    : "Purchase marked for this local workspace"
+                }
+              >
+                <span aria-hidden="true">★</span>{" "}
+                {verifiedPremium
+                  ? "Premium access verified"
+                  : "Premium purchased"}
+              </span>
+            )}
+            <span
+              className={`status ${session?.authenticated ? "connected" : ""}`}
+            >
+              <span className="dot" />
+              {session === null
+                ? "Connecting…"
+                : session.authenticated
+                  ? "PracticaTest connected"
+                  : "Not connected"}
+            </span>
+          </div>
         </div>
         {error && (
           <div className="error" role="alert">
@@ -384,6 +426,45 @@ export default function Home() {
                     Keep this app running while you practise.
                   </p>
                 </>
+              )}
+              {webUrl && (
+                <div className="remote-interface">
+                  <div className="endpoint">
+                    <span>PRIVATE WEB INTERFACE · OPEN FROM YOUR PHONE</span>
+                    <code>{webUrl}</code>
+                  </div>
+                  <div className="remote-interface-actions">
+                    <button
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() =>
+                        void action(async () => {
+                          await navigator.clipboard.writeText(webUrl);
+                          setWebUrlCopied(true);
+                          setTimeout(() => setWebUrlCopied(false), 2500);
+                        })
+                      }
+                    >
+                      {webUrlCopied
+                        ? "Interface link copied ✓"
+                        : "Copy private interface URL"}
+                    </button>
+                    <a
+                      className="secondary"
+                      href={webUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open interface ↗
+                    </a>
+                  </div>
+                  <p className="small tunnel-note">
+                    Open this link to use the interface away from your computer.
+                    It grants access to your app and account controls, so keep
+                    it private. The computer or Docker container must stay
+                    running.
+                  </p>
+                </div>
               )}
               {tunnel?.error && (
                 <div className="tunnel-error" role="alert">
@@ -522,8 +603,9 @@ export default function Home() {
               <div className="privacy-note">
                 <span>◇</span>
                 <span>
-                  Your credentials are never saved. The session stays in memory
-                  until sign-out, restart, or a two-hour expiry.
+                  Your email and password are never saved. The session is
+                  remembered securely on this device until you sign out or
+                  PracticaTest expires it.
                 </span>
               </div>
             </section>
@@ -748,6 +830,52 @@ export default function Home() {
                   Open test
                 </button>
               </form>
+              <button
+                className="secondary full refresh-access"
+                disabled={busy}
+                onClick={() =>
+                  void action(async () => {
+                    const status = await api<SessionStatus>(
+                      `account/access?permit=${permit}&language=${language}`,
+                    );
+                    setSession(status);
+                    setSections(
+                      await api<ManualSection[]>(
+                        `sections?permit=${permit}&language=${language}`,
+                      ),
+                    );
+                    setLinks(
+                      await api<TestLink[]>(
+                        `tests?permit=${permit}&language=${language}`,
+                      ),
+                    );
+                  })
+                }
+              >
+                Refresh account access
+              </button>
+              <label className="premium-setting">
+                <input
+                  type="checkbox"
+                  checked={preferences?.premiumPurchased ?? false}
+                  disabled={busy || !preferences}
+                  onChange={(event) => {
+                    const premiumPurchased = event.currentTarget.checked;
+                    void action(async () =>
+                      setPreferences(
+                        await api<WorkspacePreferences>("preferences", {
+                          method: "PATCH",
+                          body: JSON.stringify({ premiumPurchased }),
+                        }),
+                      ),
+                    );
+                  }}
+                />
+                <span>
+                  <strong>Premium purchased</strong>
+                  <small>Purchase marker saved on this device</small>
+                </span>
+              </label>
               <div className="account-note">
                 <span className="dot" />
                 Account connected

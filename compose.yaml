@@ -6,6 +6,7 @@ services:
     environment:
       PORT: ${PORT:-3000}
       TUNNEL_ENABLED: "${TUNNEL_ENABLED:-true}"
+      PERSIST_SESSION: "${PERSIST_SESSION:-true}"
     volumes:
       - practica-data:/app/data
     restart: unless-stopped
