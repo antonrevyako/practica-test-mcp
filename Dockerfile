@@ -9,6 +9,21 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build && npm prune --omit=dev
 
+# This image only includes the tunnel gateway. UI/backend-only changes leave it unchanged.
+FROM node:24-bookworm-slim AS tunnel-runtime
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 DATABASE_PATH=/app/data/practica.sqlite TUNNEL_CONTROL_PORT=4300 TUNNEL_BIND_HOST=0.0.0.0 TUNNEL_APP_HOST=practica
+COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN node -e "require('node:fs').writeFileSync('package.json', JSON.stringify({type:'module'}))"
+COPY --from=build --chown=node:node /app/dist/tunnel/daemon.js /app/dist/tunnel/runtime-paths.js /app/dist/tunnel/cloudflare-tunnel.js /app/dist/tunnel/cloudflared.js /app/dist/tunnel/gateway.js ./dist/tunnel/
+COPY --from=build --chown=node:node /app/dist/server/environment.js /app/dist/server/identity.js ./dist/server/
+COPY --from=build --chown=node:node /app/scripts/tunnel.mjs ./scripts/tunnel.mjs
+RUN mkdir -p /app/data && chown node:node /app/data
+USER node
+HEALTHCHECK --interval=2s --timeout=3s --start-period=5s CMD node -e "fetch('http://127.0.0.1:4300/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/tunnel/daemon.js"]
+
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOST=0.0.0.0 PORT=3000 DATABASE_PATH=/app/data/practica.sqlite

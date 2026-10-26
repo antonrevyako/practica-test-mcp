@@ -10,7 +10,7 @@ Install Docker Desktop or Docker Engine with the Compose plugin. Node.js is not 
 docker compose up --build -d
 ```
 
-The first build installs dependencies and creates the application image. Open **http://localhost:3000** and sign in to PracticaTest on the **Practice** tab. Then open **[MCP connection](http://localhost:3000/?tab=mcp)** for the ChatGPT and Claude Desktop connection guides. The app starts its Cloudflare tunnel automatically; no Cloudflare account or environment file is needed.
+The first build installs dependencies and creates separate application and lightweight tunnel images. Open **http://localhost:3000** and sign in to PracticaTest on the **Practice** tab. Then open **[MCP connection](http://localhost:3000/?tab=mcp)** for the ChatGPT and Claude Desktop connection guides. The app starts its Cloudflare tunnel automatically; no Cloudflare account or environment file is needed.
 
 You can also sign in through an interactive terminal inside the running container:
 
@@ -26,7 +26,7 @@ docker compose logs --tail=50 practica
 docker compose down
 ```
 
-Questions, answer history and downloaded images remain in the `practica-data` named volume when the container stops or is recreated. The container runs as the `node` user and publishes the UI and API on host loopback only. The website login is remembered across restarts. A restart creates a new temporary Cloudflare URL; update the MCP client with that new URL. PracticaTest can still expire or revoke its session.
+Questions, answer history and downloaded images remain in the `practica-data` named volume when the container stops or is recreated. The container runs as the `node` user and publishes the UI and API on host loopback only. The website login is remembered across restarts. Restarting only the application preserves its public links. Restarting or recreating the independent `tunnel` service generates new links. PracticaTest can still expire or revoke its session.
 
 If port 3000 is occupied, start on another port (macOS/Linux):
 
@@ -116,7 +116,7 @@ npm run login
 npm run session
 ```
 
-Stop the application with **Ctrl+C**. SQLite migrations run automatically, and the database is created at `data/practica.sqlite`. Question images are saved in `data/images/`. These files and the encrypted website session remain after stopping. The website session is restored on the next launch; the temporary public connection URL is generated again.
+Stop the application with **Ctrl+C**. SQLite migrations run automatically, and the database is created at `data/practica.sqlite`. Question images are saved in `data/images/`. These files and the encrypted website session remain after stopping. The website session is restored on the next launch; the independent tunnel keeps the same public links.
 
 If `better-sqlite3` has no prebuilt binary for your platform, installation needs Python 3 and C++ build tools: Xcode Command Line Tools on macOS, or `python3 make g++` on Debian/Ubuntu. The Docker build already includes them.
 
@@ -152,13 +152,49 @@ npm run login
 npm run chatgpt:prompt
 ```
 
+## Keep the public URL during app updates
+
+The Cloudflare connector and authenticated gateway run independently of the study app. The HTTPS hostname, MCP URL and private browser link stay unchanged when only the app is stopped, restarted or updated. Requests can briefly fail while the app is down; retry the same URL after it starts.
+
+### Native Node.js
+
+`npm start`, `npm run start:mcp` and development mode automatically attach to the existing tunnel process, or start it in the background when needed. Stopping the app with Ctrl+C leaves this process running. Rebuild and start the app normally; its links remain the same.
+
+Use these commands to inspect or explicitly stop it:
+
+```sh
+npm run tunnel:status
+npm run tunnel:stop
+```
+
+`npm run tunnel:restart` explicitly restarts Cloudflare and generates a new public hostname. The tunnel registry is stored privately beside the database; it contains no website password. If you use a custom database path, use the same `DATABASE_PATH` for tunnel CLI commands.
+
+### Docker
+
+Compose starts two services: `practica` for the app and `tunnel` for the independent gateway. The tunnel image only contains transport code, so UI/backend-only changes do not change that image. To restart only the app:
+
+```sh
+docker compose restart practica
+```
+
+For an app update, leave the tunnel container running:
+
+```sh
+docker compose build practica
+docker compose up -d --no-deps practica
+```
+
+Include the same storage/MCP-only override files and UID/GID variables you used at startup when running these commands. `docker compose down`, restarting/recreating `tunnel`, updating the tunnel code itself or rebooting the computer ends that tunnel session and produces new links on the next start.
+
+Without a Cloudflare account or domain, the `trycloudflare.com` hostname still belongs to the running Quick Tunnel. It cannot be reserved after that tunnel stops. The independent service keeps it alive across app updates; it does not turn it into a permanent domain.
+
 ## Use it from ChatGPT or Claude Desktop
 
 The **MCP connection** page shows the current Cloudflare HTTPS URL with **Copy public server URL** and **Copy setup prompt with token** buttons. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
 
 For ChatGPT, add the full public Server URL and choose **No authentication**: the URL already includes a private access key verified by this app. Claude Desktop can use the same public URL, or the generated local stdio configuration when this app runs natively on the same computer. The MCP connection cannot access web or administrative routes. Remote browser access uses the separate private interface link described below.
 
-Keep the app running while practising. The temporary URL changes after restarting; copy the new link and update your client. See [ChatGPT setup and authentication](docs/chatgpt.md) and [Claude Desktop setup](docs/claude-desktop.md).
+Keep the app running while practising. The temporary URL survives app-only restarts. If the independent tunnel restarts, copy its new link and update your client. See [ChatGPT setup and authentication](docs/chatgpt.md) and [Claude Desktop setup](docs/claude-desktop.md).
 
 ## Open the interface away from your computer
 
@@ -166,7 +202,7 @@ On **MCP connection**, wait for Cloudflare to become ready. Under **Private web 
 
 The web link differs from the MCP server URL. A URL ending in `/mcp/...` is for ChatGPT or Claude and does not display a web page. The browser link ends in `/app/<private-key>`; opening it establishes a protected browser session and redirects to the interface. Keep it private: it grants access to the app and its account controls. The browser key is separate from the MCP key, so an MCP connection cannot unlock administrative routes.
 
-Keep the computer or container running. Browser links change when the app or tunnel restarts. MCP-only mode does not provide a remote interface link.
+Keep the computer or container running. Browser links survive app-only restarts and change when the independent tunnel restarts. MCP-only mode does not provide a remote interface link.
 
 ## MCP connection
 
@@ -185,7 +221,7 @@ The **MCP connection** tab provides the public Cloudflare endpoint, a key-protec
 }
 ```
 
-This local token is separate from your PracticaTest password. By default, it is generated in memory at startup; update your client after restarting. You can optionally supply a persistent **local MCP token** using `MCP_TOKEN`. Website credentials are never accepted through environment variables.
+This local token is separate from your PracticaTest password. By default, it is generated once and saved privately as `mcp-token` beside the database. It survives restarts. You can override this **local MCP token** using `MCP_TOKEN`. Website credentials are never accepted through environment variables.
 
 For clients that only support stdio, use the bridge to the same running app:
 
@@ -283,18 +319,20 @@ The Practice sidebar includes a **Premium purchased** checkbox. It adds a gold b
 
 ## Configuration
 
-| Variable                        | Default                     | Purpose                                                                          |
-| ------------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
-| `PORT`                          | `3000`                      | Shared UI, API and MCP port                                                      |
-| `HOST`                          | `127.0.0.1`                 | Listen address; Docker uses `0.0.0.0`                                            |
-| `DATABASE_PATH`                 | `./data/practica.sqlite`    | SQLite path                                                                      |
-| `MCP_TOKEN`                     | Random at startup           | Optional persistent local MCP token                                              |
-| `PERSIST_SESSION`               | `true`                      | Remember the encrypted website session across restarts; `false` uses memory only |
-| `PRACTICA_DATA_DIR`             | `../practica-test-data`     | Host data folder when using `compose.storage.yaml`                               |
-| `PRACTICA_UID` / `PRACTICA_GID` | `1000` / `1000`             | Container user IDs for the host-storage override                                 |
-| `TUNNEL_ENABLED`                | `true`                      | Automatically start the Cloudflare Quick Tunnel; set `false` for local-only use  |
-| `CLOUDFLARED_PATH`              | Auto-detected or downloaded | Optional path to the Cloudflare connector                                        |
-| `PRACTICA_URL`                  | Local endpoint              | App address for the stdio bridge and live check                                  |
+| Variable                        | Default                                 | Purpose                                                                          |
+| ------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------- |
+| `PORT`                          | `3000`                                  | Shared UI, API and MCP port                                                      |
+| `HOST`                          | `127.0.0.1`                             | Listen address; Docker uses `0.0.0.0`                                            |
+| `DATABASE_PATH`                 | `./data/practica.sqlite`                | SQLite path                                                                      |
+| `MCP_TOKEN`                     | Saved locally                           | Optional persistent local MCP token                                              |
+| `PERSIST_SESSION`               | `true`                                  | Remember the encrypted website session across restarts; `false` uses memory only |
+| `PRACTICA_DATA_DIR`             | `../practica-test-data`                 | Host data folder when using `compose.storage.yaml`                               |
+| `PRACTICA_UID` / `PRACTICA_GID` | `1000` / `1000`                         | Container user IDs for the host-storage override                                 |
+| `TUNNEL_SERVICE_URL`            | Native process discovery                | Internal control endpoint; set automatically by Docker Compose                   |
+| `TUNNEL_CONTROL_PORT`           | App port + 1 natively; `4300` in Docker | Private tunnel control port                                                      |
+| `TUNNEL_ENABLED`                | `true`                                  | Automatically start the Cloudflare Quick Tunnel; set `false` for local-only use  |
+| `CLOUDFLARED_PATH`              | Auto-detected or downloaded             | Optional path to the Cloudflare connector                                        |
+| `PRACTICA_URL`                  | Local endpoint                          | App address for the stdio bridge and live check                                  |
 
 Run commands from the project root. With a custom port, open `http://localhost:<PORT>`. For example, use `PORT=3210 npm start` or `PORT=3210 docker compose up --build -d` if port 3000 is already occupied.
 
@@ -331,4 +369,4 @@ scripts/             Stdio bridge and interactive live check
 test/                Synthetic fixtures and automated checks
 ```
 
-One Node process serves the app. NestJS handles `/api/*` and `/mcp`; other requests are handled by Next.js. Website credentials enter the MCP protocol only when the user chooses the login tool; terminal and web sign-in keep them out of MCP. Question content is treated as external data, never as instructions to the AI.
+One Node process serves the app, while an independent Node process keeps the tunnel and gateway alive. NestJS handles `/api/*` and `/mcp`; other requests are handled by Next.js. Website credentials enter the MCP protocol only when the user chooses the login tool; terminal and web sign-in keep them out of MCP. Question content is treated as external data, never as instructions to the AI.

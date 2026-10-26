@@ -13,7 +13,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { ConnectionInfo } from "../src/shared/contracts.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-test("headless MCP starts without a UI, pairs stdio automatically and survives token rotation", async () => {
+test("headless MCP starts without a UI, pairs stdio automatically and keeps authentication across restarts", async () => {
   const directory = await mkdtemp(join(tmpdir(), "practica-headless-"));
   const listener = createServer();
   listener.listen(0, "127.0.0.1");
@@ -142,8 +142,16 @@ test("headless MCP starts without a UI, pairs stdio automatically and survives t
       token: string;
       prompt: string | null;
     };
-    assert.notEqual(before.token, after.token);
+    assert.equal(before.token, after.token);
     assert.equal(after.prompt, null);
+    assert.equal((await status()).authenticated, false);
+    env.MCP_TOKEN = "synthetic-explicit-identity-rotation";
+    await stop();
+    await start();
+    const rotated = (await (await fetch(`${base}/api/connection`)).json()) as {
+      token: string;
+    };
+    assert.notEqual(rotated.token, before.token);
     assert.equal((await status()).authenticated, false);
     const cookies = new CookieJar();
     cookies.setCookieSync(

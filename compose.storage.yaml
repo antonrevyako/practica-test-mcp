@@ -7,3 +7,11 @@ services:
         target: /app/data
         bind:
           create_host_path: true
+  tunnel:
+    user: "${PRACTICA_UID:-1000}:${PRACTICA_GID:-1000}"
+    volumes:
+      - type: bind
+        source: "${PRACTICA_DATA_DIR:-../practica-test-data}"
+        target: /app/data
+        bind:
+          create_host_path: true

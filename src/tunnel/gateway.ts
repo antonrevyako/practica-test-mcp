@@ -8,13 +8,22 @@ function equal(a: string, b: string) {
 }
 
 // MCP and browser access use separate capabilities on this private tunnel listener.
+export type GatewayTarget = {
+  port: number;
+  token: string;
+  hostname?: string;
+  webEnabled?: boolean;
+};
 export async function startGateway(
   appPort: number,
   bearerToken: string,
   accessKey: string,
   webAccessKey?: string,
+  options: { target?: () => GatewayTarget } = {},
 ): Promise<{ server: Server; url: string }> {
   const server = createServer((incoming, outgoing) => {
+    const target = options.target?.() ?? { port: appPort, token: bearerToken };
+    const browserKey = target.webEnabled === false ? undefined : webAccessKey;
     outgoing.setHeader("Cache-Control", "no-store");
     outgoing.setHeader("Referrer-Policy", "no-referrer");
     outgoing.setHeader("X-Content-Type-Options", "nosniff");
@@ -42,20 +51,20 @@ export async function startGateway(
         .find((value) => value.startsWith(`${browserCookie}=`))
         ?.slice(browserCookie.length + 1) ?? "";
     if (
-      webAccessKey &&
+      browserKey &&
       incoming.method === "GET" &&
       !url.search &&
-      equal(url.pathname, `/app/${webAccessKey}`)
+      equal(url.pathname, `/app/${browserKey}`)
     ) {
       outgoing.writeHead(303, {
         Location: "/",
-        "Set-Cookie": `${browserCookie}=${webAccessKey}; Path=/; Secure; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `${browserCookie}=${browserKey}; Path=/; Secure; HttpOnly; SameSite=Lax`,
       });
       outgoing.end();
       return;
     }
     const browserAllowed = Boolean(
-      webAccessKey && equal(cookieValue, webAccessKey),
+      browserKey && equal(cookieValue, browserKey),
     );
     const unsafe = !["GET", "HEAD", "OPTIONS"].includes(incoming.method ?? "");
     if (browserAllowed && unsafe) {
@@ -91,7 +100,7 @@ export async function startGateway(
     if (
       !browserAllowed &&
       !keyAllowed &&
-      !equal(incoming.headers.authorization ?? "", `Bearer ${bearerToken}`)
+      !equal(incoming.headers.authorization ?? "", `Bearer ${target.token}`)
     ) {
       outgoing.writeHead(401, {
         "Content-Type": "application/json",
@@ -109,8 +118,8 @@ export async function startGateway(
       return;
     }
     const headers: Record<string, string> = {
-      host: `127.0.0.1:${appPort}`,
-      authorization: `Bearer ${bearerToken}`,
+      host: `127.0.0.1:${target.port}`,
+      authorization: `Bearer ${target.token}`,
     };
     const forwarded = browserAllowed
       ? [
@@ -142,8 +151,8 @@ export async function startGateway(
     }
     const upstream = request(
       {
-        hostname: "127.0.0.1",
-        port: appPort,
+        hostname: target.hostname ?? "127.0.0.1",
+        port: target.port,
         path: keyAllowed
           ? "/mcp"
           : browserAllowed

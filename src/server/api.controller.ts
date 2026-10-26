@@ -37,7 +37,8 @@ const idSchema = z.uuid();
 export class ApiController {
   constructor(
     @Inject(StudyService) private readonly study: StudyService,
-    @Inject(CloudflareTunnel) private readonly tunnel: CloudflareTunnel,
+    @Inject(CloudflareTunnel)
+    private readonly tunnel: Pick<CloudflareTunnel, "status" | "retry">,
   ) {}
   @Get("api/health") health() {
     return { ok: true };

@@ -16,7 +16,7 @@ The ChatGPT URL includes a private access key. Anyone with that full URL can use
 
 Clients that support request headers can use the public `/mcp` endpoint with `Authorization: Bearer <local MCP token>` instead. This alternative appears in the copyable configuration. The prompt includes both connection forms, but never your PracticaTest password.
 
-MCP credentials authorize only MCP requests. The web interface, `/api/connection`, login form and other administrative API routes require the separate private interface link and browser session cookie; a valid MCP key alone cannot reach them. The gateway adds local authorization while forwarding MCP and does not log request paths or tokens. Tokens and connection URLs are kept in process memory; connection responses use `Cache-Control: no-store`.
+MCP credentials authorize only MCP requests. The web interface, `/api/connection`, login form and other administrative API routes require the separate private interface link and browser session cookie; a valid MCP key alone cannot reach them. The gateway adds local authorization while forwarding MCP and does not log request paths or tokens. The local MCP identity is saved privately beside the database. URL access keys stay in the independent tunnel process memory; connection responses use `Cache-Control: no-store`.
 
 The app uses Streamable HTTP with JSON responses. Cloudflare Quick Tunnels do not support SSE, so no long-lived event stream is required.
 
@@ -67,7 +67,7 @@ docker compose -f compose.yaml -f compose.mcp.yaml up --build -d
 
 ## Tunnel lifecycle
 
-[Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) create temporary `trycloudflare.com` hostnames. The public URL and private URL key change when the app or tunnel restarts. The interface refreshes its status and copied instruction automatically; update your ChatGPT connection with the new URL. Keep the app running while using it.
+[Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) create temporary `trycloudflare.com` hostnames. The public URL and private URL key survive app-only restarts and change when the independent tunnel process stops and restarts. The interface refreshes its status and copied instruction automatically; update your ChatGPT connection with the new URL. Keep the app running while using it.
 
 If startup fails, the interface shows an error and **Retry Cloudflare Tunnel**. The local app remains available. Quick Tunnels are intended for testing and personal development and have no uptime guarantee; use a managed tunnel with a stable hostname for production.
 
@@ -83,4 +83,6 @@ Automated tests check public-gateway authorization, blocked administrative route
 
 ## Private browser interface
 
-The MCP page also shows **Copy private interface URL** and **Open interface**. Use that separate `/app/<private-key>` URL to open the web interface from your phone. It sets a Secure, HttpOnly browser cookie and redirects to `/`, removing the entry key from the address bar. Cross-site writes are rejected. The link grants access to the interface and account controls, so keep it private. It is regenerated after restart and is unavailable in MCP-only mode.
+The MCP page also shows **Copy private interface URL** and **Open interface**. Use that separate `/app/<private-key>` URL to open the web interface from your phone. It sets a Secure, HttpOnly browser cookie and redirects to `/`, removing the entry key from the address bar. Cross-site writes are rejected. The link grants access to the interface and account controls, so keep it private. It survives app-only restarts, is regenerated when the independent tunnel restarts and is unavailable in MCP-only mode.
+
+The native tunnel runs in the background after the app exits; `npm run tunnel:stop` explicitly ends it. Docker uses a separate `tunnel` service. Use `docker compose restart practica` or rebuild/recreate only `practica` to keep the public URLs. See [the update commands](../README.md#keep-the-public-url-during-app-updates).

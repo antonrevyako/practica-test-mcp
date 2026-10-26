@@ -29,3 +29,8 @@ session.key
 workspace.json
 workspace.json.*.tmp
 /images/
+
+# Private connection identity and tunnel control state
+mcp-token
+tunnel-runtime.json
+tunnel-runtime.json.*.tmp

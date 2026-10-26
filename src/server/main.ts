@@ -1,3 +1,4 @@
+import "./environment.js";
 import "reflect-metadata";
 import {
   Module,
@@ -23,6 +24,7 @@ import { ApiController } from "./api.controller.js";
 import { AppError } from "./errors.js";
 import { localGuard } from "./security.js";
 import { CloudflareTunnel } from "../tunnel/cloudflare-tunnel.js";
+import { TunnelClient } from "../tunnel/tunnel-client.js";
 
 const dev = process.argv.includes("--dev");
 const mcpOnly = process.argv.includes("--mcp-only");
@@ -77,7 +79,7 @@ class SafeErrors implements ExceptionFilter {
             : undefined,
         ),
     },
-    { provide: CloudflareTunnel, useFactory: () => new CloudflareTunnel() },
+    { provide: CloudflareTunnel, useFactory: () => new TunnelClient() },
   ],
 })
 class AppModule {}
@@ -120,7 +122,7 @@ async function main() {
   const timer = setInterval(() => study.status(), 60000);
   timer.unref();
   await app.listen(port, host);
-  void app.get(CloudflareTunnel).start(port, !mcpOnly);
+  void app.get<TunnelClient>(CloudflareTunnel).start(port, !mcpOnly);
   if (web) console.log(`PracticaTest Local: http://localhost:${port}`);
   console.log(`MCP: http://localhost:${port}/mcp`);
   console.log(

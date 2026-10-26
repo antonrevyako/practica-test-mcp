@@ -4,8 +4,8 @@ import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import type { Server } from "node:http";
 import { ensureCloudflared } from "./cloudflared.js";
-import { startGateway } from "./gateway.js";
-import { localToken } from "../server/security.js";
+import { startGateway, type GatewayTarget } from "./gateway.js";
+import { localToken } from "../server/identity.js";
 
 export type TunnelStatus = {
   status:
@@ -20,6 +20,7 @@ export type TunnelDependencies = {
   spawn: (binary: string, args: string[]) => ChildProcess;
   enabled: boolean;
   probe?: (origin: string) => Promise<boolean>;
+  target?: () => GatewayTarget;
 };
 
 async function publicEndpointResponds(origin: string): Promise<boolean> {
@@ -156,6 +157,7 @@ export class CloudflareTunnel {
         localToken,
         accessKey,
         webAccessKey,
+        { target: this.deps.target },
       );
       if (generation !== this.generation) {
         gateway.server.close();

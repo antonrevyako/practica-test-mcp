@@ -514,7 +514,7 @@ export default function Home() {
                   {promptCopied
                     ? "Ready to paste into your chat."
                     : setupPrompt
-                      ? "Includes the private connection link and MCP token. A new link is generated after restarting."
+                      ? "Includes the private connection link and MCP token. The link survives app restarts; copy a new one only if the tunnel restarts."
                       : tunnel?.status === "installing"
                         ? "Downloading and verifying cloudflared on first launch…"
                         : "The prompt will be ready when Cloudflare connects."}
@@ -545,9 +545,9 @@ export default function Home() {
               </div>
               <pre>{config}</pre>
               <p className="small">
-                This token grants access to the local app. By default, it
-                changes after restarting. Your account credentials are never
-                included.
+                This token grants access to the local app and is saved privately
+                on this device. It survives restarts. Your account credentials
+                are never included.
               </p>
               <p className="small">
                 You can sign in through the MCP login tool or{" "}

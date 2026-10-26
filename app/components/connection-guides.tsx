@@ -90,8 +90,8 @@ export function ConnectionGuides({
         <p className="small guide-note">
           A chat prompt cannot add or install its own MCP server. If the menu is
           missing, check your account and workspace permissions. After
-          restarting this app, update the plugin with the new URL and refresh
-          its tools.
+          restarting the independent tunnel, update the plugin with the new URL
+          and refresh its tools. App-only restarts keep the same link.
         </p>
         <a
           className="guide-source"
@@ -148,8 +148,8 @@ export function ConnectionGuides({
         <p className="small guide-note">
           Remote connectors connect from Claude&apos;s servers, so localhost
           URLs will not work here. Team and Enterprise accounts may need an
-          owner to add the connector. Update its URL after this app or tunnel
-          restarts.
+          owner to add the connector. App-only restarts keep this URL; update it
+          if the independent tunnel restarts.
         </p>
         <a
           className="guide-source"

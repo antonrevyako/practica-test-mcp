@@ -225,6 +225,76 @@ test("private browser links authenticate UI and API access without granting that
   }
 });
 
+test("a surviving gateway keeps MCP and browser capabilities while its backend restarts on another port", async () => {
+  const target = { port: 0, token: "first-fixture-token", webEnabled: true };
+  async function backend(expected: string, label: string) {
+    const server = createServer((req, res) => {
+      if (req.headers.authorization !== `Bearer ${expected}`) {
+        res.writeHead(401);
+        res.end();
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ label, path: req.url }));
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    return server;
+  }
+  const first = await backend(target.token, "first");
+  target.port = (first.address() as { port: number }).port;
+  const key = "c".repeat(64),
+    browser = "d".repeat(64);
+  const gateway = await startGateway(target.port, target.token, key, browser, {
+    target: () => target,
+  });
+  let second: ReturnType<typeof createServer> | undefined;
+  try {
+    const mcpUrl = `${gateway.url}/mcp/${key}`;
+    const webUrl = `${gateway.url}/app/${browser}`;
+    assert.equal((await (await fetch(mcpUrl)).json()).label, "first");
+    const entry = await fetch(webUrl, { redirect: "manual" });
+    const cookie = entry.headers.get("set-cookie")!.split(";")[0];
+    first.closeAllConnections();
+    await new Promise<void>((resolve) => first.close(() => resolve()));
+    assert.equal((await fetch(mcpUrl)).status, 502);
+    target.token = "second-fixture-token";
+    second = await backend(target.token, "second");
+    target.port = (second.address() as { port: number }).port;
+    assert.deepEqual(await (await fetch(mcpUrl)).json(), {
+      label: "second",
+      path: "/mcp",
+    });
+    assert.equal((await fetch(webUrl, { redirect: "manual" })).status, 303);
+    assert.equal(
+      (
+        await (
+          await fetch(gateway.url + "/", { headers: { Cookie: cookie } })
+        ).json()
+      ).label,
+      "second",
+    );
+    target.webEnabled = false;
+    assert.equal((await fetch(webUrl, { redirect: "manual" })).status, 404);
+    assert.equal(
+      (await fetch(gateway.url + "/", { headers: { Cookie: cookie } })).status,
+      404,
+    );
+    assert.equal((await (await fetch(mcpUrl)).json()).label, "second");
+  } finally {
+    gateway.server.closeAllConnections();
+    await new Promise<void>((resolve) => gateway.server.close(() => resolve()));
+    if (first.listening) {
+      first.closeAllConnections();
+      await new Promise<void>((resolve) => first.close(() => resolve()));
+    }
+    if (second?.listening) {
+      second.closeAllConnections();
+      await new Promise<void>((resolve) => second!.close(() => resolve()));
+    }
+  }
+});
+
 test("Cloudflare connection lifecycle updates the public URL and copied instruction without leaking local URLs", async () => {
   const child = new EventEmitter() as ChildProcess;
   const stdout = new PassThrough();

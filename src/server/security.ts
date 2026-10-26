@@ -1,8 +1,8 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
+import { localToken } from "./identity.js";
+export { localToken } from "./identity.js";
 import type { Request, Response, NextFunction } from "express";
 
-export const localToken =
-  process.env.MCP_TOKEN || randomBytes(32).toString("hex");
 export function bearerValid(value: string | undefined) {
   const a = Buffer.from(value ?? "");
   const b = Buffer.from(`Bearer ${localToken}`);

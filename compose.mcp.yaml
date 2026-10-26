@@ -1,3 +1,6 @@
 services:
   practica:
     command: ["node", "dist/server/main.js", "--mcp-only"]
+  tunnel:
+    environment:
+      TUNNEL_WEB_ENABLED: "false"

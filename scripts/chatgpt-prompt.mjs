@@ -27,7 +27,7 @@ If you can operate the ChatGPT interface, open ChatGPT Plugins, add or reuse a c
 
 Once connected, call session_status and check_account_access with permit B and language en to obtain current subscription access. Use these fresh results rather than earlier free-account restrictions. If sign-in is needed, let me choose between the MCP login tool, local CLI login and the existing web interface. Never repeat my email or password. List sections using permit B and language en, retrieve one section with get_section_rules, then offer a general exam or a test for a selected section. Topic-test access follows my PracticaTest subscription. Ask questions one at a time and wait for my answers. After each answer, call submit_answer once and show the result immediately. Its response includes progress and nextQuestion; use them without extra get_test or next_question calls. Fetch get_explanation only if I ask for the website explanation, since answer checking is local. Do not call finish_test unless I explicitly ask to submit the result.
 
-Only report success after a real tool call from ChatGPT succeeds. The temporary Cloudflare hostname and access key change when the app or tunnel restarts; ask me to copy a fresh instruction if the connection has expired.
+Only report success after a real tool call from ChatGPT succeeds. The Cloudflare hostname and access key survive app-only restarts and change only when the independent tunnel restarts; ask me to copy a fresh instruction if the connection has expired.
 `;
   }
   throw new Error("The public Cloudflare connection is not ready yet.");

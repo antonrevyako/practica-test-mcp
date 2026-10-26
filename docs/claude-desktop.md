@@ -10,7 +10,7 @@ The **MCP connection** page includes both options below, current connection deta
 4. In a chat, open **+ → Connectors** beside the message box and enable **PracticaTest**.
 5. Ask Claude to call `session_status`. Only a successful tool call confirms the connection. Use **Copy practice prompt** on the MCP page to start practising.
 
-Remote connectors originate from Claude's infrastructure, including when you use Desktop. A localhost URL will not work in this form. The same public connector can be used on the web. Team and Enterprise accounts may need an owner to register it. The temporary URL changes after restarting the app or tunnel; update the connector with the new URL.
+Remote connectors originate from Claude's infrastructure, including when you use Desktop. A localhost URL will not work in this form. The same public connector can be used on the web. Team and Enterprise accounts may need an owner to register it. The temporary URL stays the same across app-only restarts. If the independent tunnel process restarts, update the connector with its new URL.
 
 See [Claude's official custom connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
 

@@ -22,7 +22,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "mcp:stdio": "node scripts/mcp-stdio.mjs",
-    "test:live": "node scripts/live-check.mjs"
+    "test:live": "node scripts/live-check.mjs",
+    "tunnel:status": "node scripts/tunnel.mjs status",
+    "tunnel:stop": "node scripts/tunnel.mjs stop",
+    "tunnel:restart": "node scripts/tunnel.mjs restart"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
