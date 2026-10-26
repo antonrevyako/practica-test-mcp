@@ -19,7 +19,7 @@ docker compose exec practica npm run login
 docker compose exec practica npm run session
 ```
 
-Both sign-in fields use hidden input. Your website credentials are not saved. To inspect startup logs or stop the application:
+Both sign-in fields use hidden input. By default, the app saves your email and password encrypted locally for automatic session recovery. Sign out to delete them. To inspect startup logs or stop the application:
 
 ```sh
 docker compose logs --tail=50 practica
@@ -243,7 +243,7 @@ The stdio bridge pairs with the local daemon automatically; setting MCP_TOKEN is
 
 | Tool                   | Purpose                                                                                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`                | Sign in with email/password supplied through MCP; credentials are not saved by the app                                                                                          |
+| `login`                | Sign in with email/password supplied through MCP; save encrypted credentials locally by default for automatic session recovery                                                     |
 | `logout`               | Clear the shared website session                                                                                                                                                |
 | `check_account_access` | Refresh actual website access for the selected language and category                                                                                                            |
 | `session_status`       | Check authentication                                                                                                                                                            |
@@ -298,9 +298,11 @@ Filter statistics by `permit`, `language`, `runId`, `questionKey` and ISO `from`
 
 ## Remembered sign-in and subscription access
 
-Sign in once through the interface, the MCP `login` tool or `npm run login`. By default, the app saves an AES-256-GCM-encrypted website session next to the database and restores it after app or container restarts. The login email and password are never saved. There is no artificial two-hour logout timer. PracticaTest can still expire or revoke its cookies; a rejected or expired website session is cleared and requires signing in again.
+Sign in once through the interface, the MCP `login` tool or `npm run login`. By default, the app saves the website session in `session.enc` and the login email and password in `credentials.enc`, both encrypted with AES-256-GCM using the local `session.key`. All three files live next to the database with owner-only permissions. Restarts restore the session. If cookies expire, read requests can sign in again using the saved credentials and retry once. Session status can also restore a missing session. Result submissions are never replayed automatically.
 
-`npm run logout`, the interface's **Sign out** action and the MCP `logout` tool delete both the remembered session and its local encryption key. Stopping the app preserves them. The session, key, database and images belong to the same data directory, so keep that folder private and include it when moving the installation. Set `PERSIST_SESSION=false` to use memory-only sign-in instead.
+`npm run logout`, the interface's **Sign out** action and the MCP `logout` tool delete the saved email, password, session and local encryption key. Stopping the app preserves them. Network outages preserve saved credentials; a rejected password clears them and requires manual sign-in. Set `PERSIST_CREDENTIALS=false` to remember only cookies, or `PERSIST_SESSION=false` for memory-only sign-in. Explicit sign-out also removes older saved files when persistence is disabled.
+
+The session, credentials, key, database and images belong to the same data directory and persist in the Docker volume or configured host folder. Keep that directory private: encryption protects the saved files, but someone who can read both the key and ciphertext can decrypt them. Existing installations with only saved cookies must sign in once more to save email and password. Credentials are never returned by the API/MCP, included in connection prompts, written to SQLite or logged. The generated files are excluded from Git and Docker build contexts.
 
 After buying or changing a subscription, use **Refresh account access** in the interface or MCP `check_account_access` with `permit=B` and `language=en`. This rechecks the website's actual section and exam links. Access is scoped to the selected language and licence category. A missing full-text link does not mean all Premium features are unavailable, and the local purchase checkbox does not grant website permissions.
 
@@ -310,8 +312,8 @@ The Practice sidebar includes a **Premium purchased** checkbox. It adds a gold b
 
 ## Data and authentication
 
-- Email and password are forwarded to PracticaTest over HTTPS. They are never saved to SQLite, files or application logs.
-- Cookies, CSRF state and active-attempt tracking are kept in encrypted local session storage by default. Explicit sign-out or website expiration clears the saved session. `PERSIST_SESSION=false` disables restoring and saving it.
+- Email and password are forwarded to PracticaTest over HTTPS and saved encrypted in `credentials.enc` by default. They never enter SQLite, connection prompts, API/MCP responses or application logs. `PERSIST_CREDENTIALS=false` disables credential persistence.
+- Cookies, CSRF state and active-attempt tracking are kept in encrypted local session storage by default. Expiration clears cookies while retaining saved credentials for recovery. Explicit sign-out deletes both. `PERSIST_SESSION=false` disables saving and restoring all sign-in state.
 - SQLite stores parsed questions, exact option order, exam identifiers and append-only answer events. Downloaded question images are saved beside the database in an `images/` directory. Full HTML and session parameters are not stored in SQLite. Remembered website state is stored separately in encrypted session files. `data/`, databases and `.env*` files are excluded from Git and the Docker context.
 - This is a single-user app for a trusted local machine. History belongs to the local workspace and remains after sign-out. Archive statistics and saved images can still be read through authenticated MCP while signed out. There is no multi-user isolation.
 - Local HTTP MCP requires a Bearer token. The Cloudflare gateway accepts the public MCP endpoint with that token or the key-protected ChatGPT URL. Web and administrative routes require the separate private browser link and its Secure, HttpOnly cookie; MCP credentials alone cannot access them.
@@ -326,6 +328,7 @@ The Practice sidebar includes a **Premium purchased** checkbox. It adds a gold b
 | `DATABASE_PATH`                 | `./data/practica.sqlite`                | SQLite path                                                                      |
 | `MCP_TOKEN`                     | Saved locally                           | Optional persistent local MCP token                                              |
 | `PERSIST_SESSION`               | `true`                                  | Remember the encrypted website session across restarts; `false` uses memory only |
+| `PERSIST_CREDENTIALS`           | `true`                                  | Save encrypted email/password for automatic recovery; requires session persistence |
 | `PRACTICA_DATA_DIR`             | `../practica-test-data`                 | Host data folder when using `compose.storage.yaml`                               |
 | `PRACTICA_UID` / `PRACTICA_GID` | `1000` / `1000`                         | Container user IDs for the host-storage override                                 |
 | `TUNNEL_SERVICE_URL`            | Native process discovery                | Internal control endpoint; set automatically by Docker Compose                   |

@@ -44,7 +44,7 @@ export class ApiController {
     return { ok: true };
   }
   @Get("api/session") status() {
-    return this.study.status();
+    return this.study.restoreSession();
   }
   @Post("api/session") login(@Body() body: unknown) {
     const data = credentialsSchema.parse(body);

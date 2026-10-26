@@ -47,11 +47,11 @@ For a custom port, use `PORT=3210 npm start` and `npm run chatgpt:prompt -- --po
 
 ## Sign in
 
-- MCP: call `login` with `email` and `password`, then `session_status`. The app does not persist or return these credentials, but ChatGPT processes them as tool arguments.
+- MCP: call `login` with `email` and `password`, then `session_status`. The app saves these credentials encrypted locally by default and never returns them; ChatGPT processes them as tool arguments.
 - CLI: run `npm run login` in a second terminal. Both fields use hidden input. Use `npm run session` to check and `npm run logout` to clear the session. Set `PRACTICA_URL=http://127.0.0.1:3210` for a custom port.
 - Web: use the existing sign-in form.
 
-All three methods share the same remembered session. Its cookies and CSRF state are encrypted beside the database, while the login email and password are never saved. Restarting restores the session; explicit sign-out or expiration by PracticaTest requires signing in again. Set `PERSIST_SESSION=false` for memory-only sign-in.
+All three methods share the same remembered session. Cookies, CSRF state and login credentials are encrypted beside the database. Restarting restores cookies; expired cookies can be renewed using the saved email and password. Read requests retry once after recovery; result submissions are never replayed. Explicit sign-out deletes credentials, cookies and their key. A rejected password requires manual sign-in. Set `PERSIST_CREDENTIALS=false` to remember only cookies, or `PERSIST_SESSION=false` for memory-only sign-in. Existing installations need one new sign-in to save credentials.
 
 ## Docker
 

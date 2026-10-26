@@ -54,7 +54,7 @@ export function createMcp(study: StudyService) {
     "login",
     {
       description:
-        "Sign in to PracticaTest using email and password supplied by the user. Credentials are forwarded over HTTPS and never persisted or returned by this server; MCP arguments are still processed by the calling chat client. Use only when the user chooses MCP login. Alternatively, the local operator can run npm run login without sending credentials through chat. The session is shared with the local daemon and is remembered in encrypted local storage by default. Password and email are never saved. PracticaTest can still expire or revoke the session.",
+        "Sign in to PracticaTest using email and password supplied by the user. Credentials are forwarded over HTTPS and saved encrypted locally by default, together with the shared session, so expired sessions can be restored automatically. Credentials are never returned by this server; MCP arguments are still processed by the calling chat client. Use only when the user chooses MCP login. Alternatively, the local operator can run npm run login without sending credentials through chat. Set PERSIST_CREDENTIALS=false to disable saving email and password, or PERSIST_SESSION=false for memory-only sign-in. Sign out to delete saved credentials and session state.",
       inputSchema: credentialsSchema.shape,
       annotations: {
         readOnlyHint: false,
@@ -69,7 +69,7 @@ export function createMcp(study: StudyService) {
     "logout",
     {
       description:
-        "Sign out of the shared PracticaTest session and delete its remembered local cookies and encryption key. All connected clients will need to sign in again. Local practice history is preserved.",
+        "Sign out of the shared PracticaTest session and delete its remembered local email, password, cookies and encryption key. All connected clients will need to sign in again. Local practice history is preserved.",
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -83,10 +83,10 @@ export function createMcp(study: StudyService) {
     "session_status",
     {
       description:
-        "Check local authentication, whether the session is remembered, its last verification time and observed account access by language and permit. To verify access after a purchase or refresh outdated information, call check_account_access. The user can sign in with login or npm run login locally. Never repeat credentials.",
+        "Check authentication, whether the session and credentials are remembered, the last verification time and observed account access by language and permit. If signed out with saved credentials, attempt to restore website login without returning email or password. To verify access after a purchase or refresh outdated information, call check_account_access. The user can sign in with login or npm run login locally. Never repeat credentials.",
       annotations: read,
     },
-    wrap(() => study.status()),
+    wrap(() => study.restoreSession()),
   );
   server.registerTool(
     "check_account_access",

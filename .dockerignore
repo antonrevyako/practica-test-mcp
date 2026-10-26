@@ -7,6 +7,8 @@ data
 *.db*
 *.sqlite*
 coverage
+tsconfig.tsbuildinfo
+graphify-out
 
 # Keep local credentials and private keys out of build contexts
 .npmrc
@@ -22,6 +24,8 @@ coverage
 # Generated workspace state, including custom database locations
 session.enc
 session.enc.*.tmp
+credentials.enc
+credentials.enc.*.tmp
 session.key
 workspace.json
 workspace.json.*.tmp
@@ -31,3 +35,17 @@ workspace.json.*.tmp
 mcp-token
 tunnel-runtime.json
 tunnel-runtime.json.*.tmp
+
+# Protect authentication state in custom database directories too.
+**/session.enc
+**/session.enc.*.tmp
+**/session.key
+**/credentials.enc
+**/credentials.enc.*.tmp
+**/mcp-token
+**/tunnel-runtime.json
+**/tunnel-runtime.json.*.tmp
+**/workspace.json
+**/workspace.json.*.tmp
+**/*.sqlite*
+**/*.db*

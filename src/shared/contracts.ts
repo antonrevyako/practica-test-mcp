@@ -135,6 +135,7 @@ export type SessionStatus = {
   authenticated: boolean;
   expiresAt: string | null;
   remembered: boolean;
+  credentialsRemembered: boolean;
   lastVerifiedAt: string | null;
   access: AccountAccess[];
 };

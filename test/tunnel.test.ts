@@ -23,6 +23,7 @@ test("public gateway authenticates MCP and keeps the UI and administrative API p
   app.use(express.json({ limit: "16kb" }));
   const study = {
     status: () => ({ authenticated: false, expiresAt: null }),
+    restoreSession: async () => ({ authenticated: false, expiresAt: null }),
   } as StudyService;
   app.all("/mcp", async (req, res) => {
     const mcp = createMcp(study);

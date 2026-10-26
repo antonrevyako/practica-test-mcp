@@ -17,6 +17,7 @@ import {
 import { join } from "node:path";
 import { z } from "zod";
 import { AppError } from "../server/errors.js";
+import { credentialsSchema } from "../shared/contracts.js";
 
 const sessionSchema = z
   .object({
@@ -32,12 +33,15 @@ export type SavedSession = z.infer<typeof sessionSchema>;
 export class SessionStore {
   readonly file: string;
   readonly keyFile: string;
+  readonly credentialsFile: string;
   constructor(
     readonly directory: string,
     readonly enabled = true,
+    readonly credentialsEnabled = enabled,
   ) {
     this.file = join(directory, "session.enc");
     this.keyFile = join(directory, "session.key");
+    this.credentialsFile = join(directory, "credentials.enc");
   }
   private key(create: boolean) {
     if (create) {
@@ -56,11 +60,11 @@ export class SessionStore {
     chmodSync(this.keyFile, 0o600);
     return key;
   }
-  load(): SavedSession | null {
-    if (!this.enabled || !existsSync(this.file)) return null;
+  private read(file: string, maximum: number): unknown {
+    if (!existsSync(file)) return null;
     try {
-      if (statSync(this.file).size > 8 * 1024 * 1024) return null;
-      const stored = readFileSync(this.file);
+      if (statSync(file).size > maximum) return null;
+      const stored = readFileSync(file);
       if (stored.length < 29 || stored[0] !== 1) return null;
       const decipher = createDecipheriv(
         "aes-256-gcm",
@@ -72,21 +76,31 @@ export class SessionStore {
         decipher.update(stored.subarray(29)),
         decipher.final(),
       ]);
-      chmodSync(this.file, 0o600);
-      return sessionSchema.parse(JSON.parse(plaintext.toString("utf8")));
+      chmodSync(file, 0o600);
+      return JSON.parse(plaintext.toString("utf8"));
     } catch {
       return null;
     }
   }
-  save(value: SavedSession) {
-    if (!this.enabled) return;
+  load(): SavedSession | null {
+    if (!this.enabled) return null;
+    const result = sessionSchema.safeParse(this.read(this.file, 8 * 1024 * 1024));
+    return result.success ? result.data : null;
+  }
+  loadCredentials(): z.infer<typeof credentialsSchema> | null {
+    if (!this.enabled || !this.credentialsEnabled) return null;
+    const result = credentialsSchema.safeParse(
+      this.read(this.credentialsFile, 16 * 1024),
+    );
+    return result.success ? result.data : null;
+  }
+  private write(file: string, value: unknown) {
     let temporary: string | undefined;
     try {
-      const session = sessionSchema.parse(value);
       const iv = randomBytes(12);
       const cipher = createCipheriv("aes-256-gcm", this.key(true), iv);
       const ciphertext = Buffer.concat([
-        cipher.update(JSON.stringify(session), "utf8"),
+        cipher.update(JSON.stringify(value), "utf8"),
         cipher.final(),
       ]);
       const stored = Buffer.concat([
@@ -95,21 +109,34 @@ export class SessionStore {
         cipher.getAuthTag(),
         ciphertext,
       ]);
-      temporary = `${this.file}.${randomUUID()}.tmp`;
+      temporary = `${file}.${randomUUID()}.tmp`;
       writeFileSync(temporary, stored, { flag: "wx", mode: 0o600 });
-      renameSync(temporary, this.file);
+      renameSync(temporary, file);
     } catch {
       throw new AppError(
         500,
         "SESSION_SAVE_FAILED",
-        "Could not remember the session. Check that the application data directory is writable.",
+        "Could not remember sign-in. Check that the application data directory is writable.",
       );
     } finally {
       if (temporary) rmSync(temporary, { force: true });
     }
   }
+  save(value: SavedSession) {
+    if (this.enabled) this.write(this.file, sessionSchema.parse(value));
+  }
+  saveCredentials(value: z.infer<typeof credentialsSchema>) {
+    if (this.enabled && this.credentialsEnabled)
+      this.write(this.credentialsFile, credentialsSchema.parse(value));
+  }
+  clearSession() {
+    rmSync(this.file, { force: true });
+    if (!existsSync(this.credentialsFile))
+      rmSync(this.keyFile, { force: true });
+  }
   clear() {
     rmSync(this.file, { force: true });
+    rmSync(this.credentialsFile, { force: true });
     rmSync(this.keyFile, { force: true });
   }
 }

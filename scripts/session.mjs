@@ -7,11 +7,14 @@ try {
   if (command === "login") {
     // Validate connectivity before collecting credentials.
     await localApi(target, "health");
+    console.log(
+      "By default, successful sign-in saves encrypted credentials on this device. Sign out to delete them.",
+    );
     let email = await hiddenPrompt(
-      "PracticaTest email (hidden, never saved): ",
+      "PracticaTest email (hidden): ",
     );
     let password = await hiddenPrompt(
-      "PracticaTest password (hidden, never saved): ",
+      "PracticaTest password (hidden): ",
     );
     try {
       const session = await localApi(target, "session", {
@@ -21,8 +24,10 @@ try {
       if (!session.authenticated)
         throw new Error("The website did not confirm authentication.");
       console.log(
-        session.remembered
-          ? "Signed in. The session is remembered across restarts; PracticaTest may still expire it."
+        session.credentialsRemembered
+          ? "Signed in. Email, password and session are saved encrypted; expired sessions can be restored automatically."
+          : session.remembered
+          ? "Signed in. The session is remembered; email and password are not saved."
           : "Signed in. This session is kept in memory only.",
       );
     } finally {
@@ -32,13 +37,15 @@ try {
   } else if (command === "logout") {
     await localApi(target, "session", { method: "DELETE" });
     console.log(
-      "Signed out. The website session and its remembered local copy have been cleared.",
+      "Signed out. Saved email, password, website session and encryption key have been cleared.",
     );
   } else if (command === "status") {
     const session = await localApi(target, "session");
     console.log(
       session.authenticated
-        ? session.remembered
+        ? session.credentialsRemembered
+          ? "Signed in. Encrypted sign-in details are saved for automatic session recovery."
+          : session.remembered
           ? "Signed in. Session is remembered across restarts."
           : "Signed in. Session is kept in memory only."
         : "Signed out. Run npm run login.",

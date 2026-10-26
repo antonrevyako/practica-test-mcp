@@ -54,6 +54,18 @@ export class StudyService {
   status() {
     return this.provider.status();
   }
+  restoreSession() {
+    if (this.provider.status().authenticated)
+      return Promise.resolve(this.status());
+    return this.exclusive(async () => {
+      try {
+        await this.provider.restoreLogin();
+      } catch {
+        // Keep status available during an outage; explicit login and study calls report errors.
+      }
+      return this.status();
+    });
+  }
   checkAccountAccess(permit: Permit = "B", language: "en" | "es" = "en") {
     return this.exclusive(() =>
       this.provider.checkAccountAccess(permit, language),

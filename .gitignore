@@ -25,6 +25,8 @@ graphify-out/
 # Generated workspace state, including custom database locations
 session.enc
 session.enc.*.tmp
+credentials.enc
+credentials.enc.*.tmp
 session.key
 workspace.json
 workspace.json.*.tmp

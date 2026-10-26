@@ -26,6 +26,7 @@ export class PracticaTest {
   private verifiedAt: string | null = null;
   private access = new Map<string, AccountAccess>();
   private tracking = new Map<string, string>();
+  private restoring: Promise<SessionStatus> | null = null;
   constructor(
     private readonly fetcher: typeof fetch = fetch,
     private readonly sessionStore?: SessionStore,
@@ -39,7 +40,7 @@ export class PracticaTest {
         this.tracking = new Map(Object.entries(saved.tracking));
         this.authenticated = true;
       } catch {
-        this.logout();
+        this.invalidateSession();
       }
     }
   }
@@ -58,12 +59,13 @@ export class PracticaTest {
       authenticated: this.authenticated,
       expiresAt: null,
       remembered: Boolean(this.sessionStore?.enabled && this.authenticated),
+      credentialsRemembered: Boolean(this.sessionStore?.loadCredentials()),
       lastVerifiedAt: this.verifiedAt,
       access: [...this.access.values()],
     };
   }
   requireSession() {
-    if (!this.status().authenticated)
+    if (!this.authenticated)
       throw new AppError(
         401,
         "LOGIN_REQUIRED",
@@ -81,6 +83,10 @@ export class PracticaTest {
   logout() {
     this.resetMemory();
     this.sessionStore?.clear();
+  }
+  private invalidateSession() {
+    this.resetMemory();
+    this.sessionStore?.clearSession();
   }
   dispose() {
     this.resetMemory();
@@ -134,7 +140,7 @@ export class PracticaTest {
         continue;
       }
       if (response.status === 401 || response.status === 419) {
-        this.logout();
+        this.invalidateSession();
         throw new AppError(
           401,
           "SESSION_EXPIRED",
@@ -182,50 +188,95 @@ export class PracticaTest {
   async login(email: string, password: string) {
     this.logout();
     try {
-      await this.request("/");
-      const result = this.json(
-        await this.request("/ajax/login", {
-          "login-email": email,
-          "login-password": password,
-          "login-redirect": "",
-        }),
-      );
-      if (!result.success)
-        throw new AppError(
-          401,
-          "INVALID_CREDENTIALS",
-          "Sign-in failed. Check your email and password on PracticaTest.",
-        );
-      const check = await this.request("/tests/permiso-B");
-      if (!isAuthenticated(check))
-        throw new AppError(
-          401,
-          "LOGIN_UNVERIFIED",
-          "The website did not confirm authentication.",
-        );
-      this.authenticated = true;
-      this.verifiedAt = new Date().toISOString();
-      this.persist();
+      await this.signIn(email, password);
+      this.sessionStore?.saveCredentials({ email, password });
       return this.status();
     } catch (error) {
       this.logout();
       throw error;
     }
   }
-  private async authenticatedPage(url: string) {
-    this.requireSession();
-    const html = await this.request(url);
-    if (!isAuthenticated(html)) {
-      this.logout();
+  private async signIn(email: string, password: string) {
+    await this.request("/");
+    const result = this.json(
+      await this.request("/ajax/login", {
+        "login-email": email,
+        "login-password": password,
+        "login-redirect": "",
+      }),
+    );
+    if (!result.success)
       throw new AppError(
         401,
-        "SESSION_EXPIRED",
-        "Your website session has expired. Sign in again.",
+        "INVALID_CREDENTIALS",
+        "Sign-in failed. Check your email and password on PracticaTest.",
       );
-    }
+    const check = await this.request("/tests/permiso-B");
+    if (!isAuthenticated(check))
+      throw new AppError(
+        401,
+        "LOGIN_UNVERIFIED",
+        "The website did not confirm authentication.",
+      );
+    this.authenticated = true;
     this.verifiedAt = new Date().toISOString();
     this.persist();
-    return html;
+  }
+  async restoreLogin(): Promise<SessionStatus> {
+    if (this.authenticated) return this.status();
+    if (this.restoring) return this.restoring;
+    const credentials = this.sessionStore?.loadCredentials();
+    if (!credentials) return this.status();
+    const pending = (async () => {
+      this.invalidateSession();
+      try {
+        await this.signIn(credentials.email, credentials.password);
+        return this.status();
+      } catch (error) {
+        this.invalidateSession();
+        if (
+          error instanceof AppError &&
+          ["INVALID_CREDENTIALS", "LOGIN_UNVERIFIED"].includes(error.code)
+        )
+          this.logout();
+        throw error;
+      }
+    })();
+    this.restoring = pending;
+    try {
+      return await pending;
+    } finally {
+      if (this.restoring === pending) this.restoring = null;
+    }
+  }
+  private async authenticatedPage(url: string, canRestore = true): Promise<string> {
+    await this.restoreLogin();
+    this.requireSession();
+    try {
+      const html = await this.request(url);
+      if (!isAuthenticated(html)) {
+        this.invalidateSession();
+        throw new AppError(
+          401,
+          "SESSION_EXPIRED",
+          "Your website session has expired. Sign in again.",
+        );
+      }
+      this.verifiedAt = new Date().toISOString();
+      this.persist();
+      return html;
+    } catch (error) {
+      if (
+        canRestore &&
+        error instanceof AppError &&
+        error.code === "SESSION_EXPIRED" &&
+        this.sessionStore?.loadCredentials()
+      ) {
+        await this.restoreLogin();
+        return this.authenticatedPage(url, false);
+      }
+      throw error;
+    }
   }
   async list(
     permit: Permit,

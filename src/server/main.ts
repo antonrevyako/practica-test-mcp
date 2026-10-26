@@ -75,6 +75,7 @@ class SafeErrors implements ExceptionFilter {
             ? new SessionStore(
                 store.dataDirectory,
                 process.env.PERSIST_SESSION !== "false",
+                process.env.PERSIST_CREDENTIALS !== "false",
               )
             : undefined,
         ),

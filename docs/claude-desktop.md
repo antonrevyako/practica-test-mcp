@@ -34,6 +34,6 @@ See [the official local MCP setup guide](https://modelcontextprotocol.io/docs/de
 
 ## Sign in and practise
 
-Sign in from the Practice tab, run `npm run login` in the project directory, or choose the MCP `login` tool. MCP login arguments are processed by the chat client. All three methods share the remembered session; the app never persists the login email or password. Saved cookies are encrypted and restored after restart, until PracticaTest expires them or the user signs out.
+Sign in from the Practice tab, run `npm run login` in the project directory, or choose the MCP `login` tool. MCP login arguments are processed by the chat client. All three methods share the remembered session and save email/password encrypted locally by default. Restarts restore cookies; expired cookies can be renewed automatically using saved credentials. Explicit sign-out deletes credentials, session and key. A rejected password requires manual sign-in. Set `PERSIST_CREDENTIALS=false` to save only cookies, or `PERSIST_SESSION=false` for memory-only sign-in. Existing installations need one new sign-in to save credentials.
 
 `submit_answer` grades locally and includes progress and the next question. Ask for the website explanation when needed. Only `finish_test` submits the completed exam, following an explicit user request.

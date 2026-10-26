@@ -1,4 +1,4 @@
-// Interactive only: credentials are never command arguments, environment variables or files.
+// Interactive only: credentials are never command arguments, environment variables or plaintext files.
 import assert from "node:assert/strict";
 import { hiddenPrompt } from "./terminal-input.mjs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -26,10 +26,10 @@ let client;
 let stdioClient;
 try {
   let email = await hiddenPrompt(
-    "Test account email (not displayed or saved): ",
+    "Test account email (hidden; saved encrypted until sign-out): ",
   );
   let password = await hiddenPrompt(
-    "Test account password (not displayed or saved): ",
+    "Test account password (hidden; saved encrypted until sign-out): ",
   );
   const { token } = await api("connection");
   client = new Client({ name: "practica-live-check", version: "1.0.0" });

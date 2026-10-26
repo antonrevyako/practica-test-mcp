@@ -569,6 +569,19 @@ export default function Home() {
                 Sign in to your account to access your tests and start
                 practising.
               </p>
+              {session?.credentialsRemembered && (
+                <button
+                  className="secondary full"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () =>
+                      setSession(await api<SessionStatus>("session")),
+                    )
+                  }
+                >
+                  Retry saved sign-in
+                </button>
+              )}
               <form onSubmit={login} autoComplete="off">
                 <label>
                   Email
@@ -603,9 +616,9 @@ export default function Home() {
               <div className="privacy-note">
                 <span>◇</span>
                 <span>
-                  Your email and password are never saved. The session is
-                  remembered securely on this device until you sign out or
-                  PracticaTest expires it.
+                  By default, your email, password and session are saved
+                  encrypted on this device. Expired sessions are restored
+                  automatically. Sign out to delete saved sign-in details.
                 </span>
               </div>
             </section>
@@ -898,6 +911,12 @@ export default function Home() {
                   Sign out
                 </button>
               </div>
+              {session.credentialsRemembered && (
+                <p className="small">
+                  Email and password saved encrypted on this device. Sign out
+                  to forget them.
+                </p>
+              )}
             </aside>
             <section className="question-area">
               {rules ? (
