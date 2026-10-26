@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793010692338,
+      "tag": "0000_nasty_sheva_callister",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793018155474,
+      "tag": "0001_study_archive",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+.git
+node_modules
+.next
+dist
+data
+.env*
+*.db*
+*.sqlite*
+coverage
+
+# Keep local credentials and private keys out of build contexts
+.npmrc
+.netrc
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+.DS_Store

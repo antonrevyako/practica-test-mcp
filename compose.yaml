@@ -1,0 +1,16 @@
+services:
+  practica:
+    build: .
+    ports:
+      - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
+    environment:
+      PORT: ${PORT:-3000}
+      TUNNEL_ENABLED: "${TUNNEL_ENABLED:-true}"
+    volumes:
+      - practica-data:/app/data
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  practica-data:

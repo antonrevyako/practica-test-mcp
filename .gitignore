@@ -1,0 +1,23 @@
+node_modules/
+.next/
+dist/
+data/
+coverage/
+*.db
+*.db-*
+*.sqlite*
+.env*
+!.env.example
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+graphify-out/
+
+# Local credentials and private key material
+.npmrc
+.netrc
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx

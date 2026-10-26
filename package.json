@@ -1,0 +1,63 @@
+{
+  "name": "practica-test-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server/main.ts --dev",
+    "dev:mcp": "tsx watch src/server/main.ts --dev --mcp-only",
+    "build": "next build && tsc -p tsconfig.server.json",
+    "build:mcp": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/main.js",
+    "start:mcp": "node dist/server/main.js --mcp-only",
+    "login": "node scripts/session.mjs login",
+    "logout": "node scripts/session.mjs logout",
+    "session": "node scripts/session.mjs status",
+    "chatgpt:prompt": "node scripts/chatgpt-prompt.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "mcp:stdio": "node scripts/mcp-stdio.mjs",
+    "test:live": "node scripts/live-check.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@nestjs/common": "^12.2.0",
+    "@nestjs/core": "^12.2.0",
+    "@nestjs/platform-express": "^12.2.0",
+    "better-sqlite3": "^12.0.0",
+    "cheerio": "^1.1.2",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.1.0",
+    "next": "^16.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "tough-cookie": "^6.0.0",
+    "zod": "^4.6.7"
+  },
+  "overrides": {
+    "multer": "^2.5.0",
+    "esbuild": "0.28.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}
