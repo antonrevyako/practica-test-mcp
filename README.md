@@ -97,6 +97,54 @@ PRACTICA_UID="$(id -u)" PRACTICA_GID="$(id -g)" docker compose -f compose.yaml -
 
 This keeps the original named volume as well as the copied host data. Do not run two app instances against the same database and session directory at the same time.
 
+## Hosted deployment with your own HTTPS domain
+
+The default remains unchanged: local Node.js and Docker installations automatically
+start a Cloudflare tunnel and show its public links on the **MCP connection** tab.
+No hosting configuration is required for those installations.
+
+For an installation behind your own HTTPS domain, configure these **server-side
+runtime environment variables** in your hosting platform (not in source code or
+the image build arguments):
+
+| Variable | Meaning |
+| --- | --- |
+| `HOSTED_PUBLIC_URL` | Your HTTPS origin, for example `https://study.example.com`. No credentials, path prefix, query or fragment. |
+| `HOSTED_ACCESS_KEY` | The existing authenticated gateway's MCP path key: 64 lowercase hexadecimal characters. |
+| `HOSTED_WEB_ACCESS_KEY` | Optional existing gateway browser key, also 64 lowercase hexadecimal characters. Omit it to hide the private browser link. |
+| `TUNNEL_ENABLED=false` | Disable the automatic Cloudflare connector on the hosted installation. |
+
+When `HOSTED_PUBLIC_URL` is configured, **MCP connection** shows **HOSTED HTTPS**
+instead of Cloudflare and advertises:
+
+- `https://study.example.com/mcp/<HOSTED_ACCESS_KEY>` for ChatGPT and Claude;
+- `https://study.example.com/app/<HOSTED_WEB_ACCESS_KEY>` for private browser access,
+  when a browser key is configured and the web interface is enabled.
+
+The guides use hosted-server instructions rather than asking you to keep a
+Cloudflare tunnel running. App restarts do not change these links; changing the
+configured domain or gateway keys does. Retry reloads the hosted configuration
+without starting Cloudflare. Invalid hosted configuration shows a generic error
+and no public links; it does not silently fall back to a tunnel. A ready hosted
+status means the configuration is valid, **not** that DNS, TLS or network access
+has been probed.
+
+**These variables advertise an existing gateway; they do not create one.** The
+application's localhost-only host/origin guard and MCP Bearer authentication are
+unchanged. Route the domain through a separately configured authenticated gateway
+that accepts the same MCP/browser keys, enforces browser access and forwards to
+the app's private listener. Do not expose the administrative app port directly,
+disable its guards or infer trusted public URLs from client-supplied headers.
+Keep the database/session directory on persistent storage, as with local Docker.
+
+Treat both keyed URLs as credentials: anyone holding one can use the corresponding
+capability. Store actual domains and keys only in private hosting settings. Never
+commit live values, private links, account information or environment-file contents
+to a public repository. Examples above use a reserved example domain and contain
+no deployment-specific values. Existing Docker Compose settings do not forward
+these new variables automatically; add them in your private deployment configuration
+if you use Compose for hosting.
+
 ## Start without Docker
 
 Install **Node.js 22.13 or newer** and npm. The Docker image and application have been tested with Node.js 24. Clone or download this repository and run these commands from its root directory:
@@ -190,7 +238,7 @@ Without a Cloudflare account or domain, the `trycloudflare.com` hostname still b
 
 ## Use it from ChatGPT or Claude Desktop
 
-The **MCP connection** page shows the current Cloudflare HTTPS URL with a **Copy public server URL** button. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
+The **MCP connection** page shows the current Cloudflare HTTPS URL (or your configured hosted HTTPS URL) with a **Copy public server URL** button. See **Hosted deployment with your own HTTPS domain** above for hosting configuration. It includes separate step-by-step guides and copyable connection details for each client. Create, install and select the connector first; pasting a prompt alone cannot register MCP tools in a normal chat.
 
 For ChatGPT, add the full public Server URL and choose **No authentication**: the URL already includes a private access key verified by this app. Claude Desktop can use the same public URL, or the generated local stdio configuration when this app runs natively on the same computer. The MCP connection cannot access web or administrative routes. Remote browser access uses the separate private interface link described below.
 

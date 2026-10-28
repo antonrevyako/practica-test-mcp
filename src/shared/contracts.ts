@@ -10,6 +10,7 @@ export type ConnectionInfo = {
   prompt: string | null;
   claudeDesktopConfig: string | null;
   tunnel: {
+    provider?: "cloudflare" | "hosted";
     status:
       | "disabled"
       | "starting"

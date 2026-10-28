@@ -7,10 +7,12 @@ const practicePrompt = `Use the PracticaTest MCP tools. First call session_statu
 export function ConnectionGuides({
   publicUrl,
   desktopConfig,
+  hosted = false,
   onError,
 }: {
   publicUrl: string;
   desktopConfig: string | null;
+  hosted?: boolean;
   onError: (message: string) => void;
 }) {
   const [copied, setCopied] = useState("");
@@ -33,8 +35,9 @@ export function ConnectionGuides({
         <div className="eyebrow">PUBLIC HTTPS · STREAMABLE HTTP</div>
         <h3 id="chatgpt-guide">Connect ChatGPT</h3>
         <p className="small">
-          Use ChatGPT on the web. Keep this app and its Cloudflare tunnel
-          running.
+          {hosted
+            ? "Use ChatGPT on the web. Keep the hosted app and its authenticated HTTPS gateway running."
+            : "Use ChatGPT on the web. Keep this app and its Cloudflare tunnel running."}
         </p>
         <ol>
           <li>
@@ -89,9 +92,10 @@ export function ConnectionGuides({
         </button>
         <p className="small guide-note">
           A chat prompt cannot add or install its own MCP server. If the menu is
-          missing, check your account and workspace permissions. After
-          restarting the independent tunnel, update the plugin with the new URL
-          and refresh its tools. App-only restarts keep the same link.
+          missing, check your account and workspace permissions. After{" "}
+          {hosted
+            ? "changing the hosted domain or access key, update the plugin URL and refresh its tools. Normal restarts keep the same link."
+            : "restarting the independent tunnel, update the plugin with the new URL and refresh its tools. App-only restarts keep the same link."}
         </p>
         <a
           className="guide-source"
@@ -107,8 +111,7 @@ export function ConnectionGuides({
         <div className="eyebrow">PUBLIC LINK · WORKS WITH DOCKER</div>
         <h3 id="claude-guide">Connect Claude Desktop</h3>
         <p className="small">
-          The public connector uses the same Cloudflare URL and also works in
-          Claude on the web.
+          The public connector uses the same {hosted ? "hosted HTTPS" : "Cloudflare"} URL and also works in Claude on the web.
         </p>
         <ol>
           <li>
@@ -148,8 +151,8 @@ export function ConnectionGuides({
         <p className="small guide-note">
           Remote connectors connect from Claude&apos;s servers, so localhost
           URLs will not work here. Team and Enterprise accounts may need an
-          owner to add the connector. App-only restarts keep this URL; update it
-          if the independent tunnel restarts.
+          owner to add the connector. App-only restarts keep this URL; update it{" "}
+          {hosted ? "if the hosted domain or access key changes." : "if the independent tunnel restarts."}
         </p>
         <a
           className="guide-source"

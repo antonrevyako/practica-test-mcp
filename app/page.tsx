@@ -261,7 +261,7 @@ export default function Home() {
     {
       mcpServers: {
         practicatest: {
-          url: publicUrl || "<Cloudflare URL is being generated>",
+          url: publicUrl || "<Public HTTPS URL is not ready>",
           headers: {
             Authorization: `Bearer ${token || "<token from the local UI>"}`,
           },
@@ -383,7 +383,7 @@ export default function Home() {
               </p>
               <div className="endpoint">
                 <span>
-                  CLOUDFLARE HTTPS ·{" "}
+                  {tunnel?.provider === "hosted" ? "HOSTED HTTPS" : "CLOUDFLARE HTTPS"} ·{" "}
                   {tunnel?.status.toUpperCase() ?? "STARTING"}
                 </span>
                 <code>
@@ -474,7 +474,7 @@ export default function Home() {
                       })
                     }
                   >
-                    Retry Cloudflare Tunnel
+                    {tunnel.provider === "hosted" ? "Retry hosted connection" : "Retry Cloudflare Tunnel"}
                   </button>
                 </div>
               )}
@@ -507,6 +507,7 @@ export default function Home() {
             </section>
             <ConnectionGuides
               publicUrl={chatgptUrl}
+              hosted={tunnel?.provider === "hosted"}
               desktopConfig={claudeDesktopConfig}
               onError={setError}
             />

@@ -8,6 +8,7 @@ import { startGateway, type GatewayTarget } from "./gateway.js";
 import { localToken } from "../server/identity.js";
 
 export type TunnelStatus = {
+  provider?: "cloudflare" | "hosted";
   status:
     "disabled" | "starting" | "installing" | "ready" | "reconnecting" | "error";
   publicUrl: string | null;

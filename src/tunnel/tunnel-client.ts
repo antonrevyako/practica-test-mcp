@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { localToken } from "../server/identity.js";
 import { readRegistry, type TunnelRegistry } from "./runtime-paths.js";
 import type { TunnelStatus } from "./cloudflare-tunnel.js";
+import { hostedConnection } from "./hosted-connection.js";
 
 const empty = (
   status: TunnelStatus["status"],
@@ -16,7 +17,7 @@ const empty = (
   error,
 });
 export class TunnelClient {
-  private value = empty(
+  private value = hostedConnection(process.env) ?? empty(
     process.env.TUNNEL_ENABLED === "false" ? "disabled" : "starting",
   );
   private timer: NodeJS.Timeout | null = null;
@@ -110,6 +111,11 @@ export class TunnelClient {
     this.closed = false;
     const generation = ++this.generation;
     if (this.timer) clearTimeout(this.timer);
+    const hosted = hostedConnection(process.env, webEnabled);
+    if (hosted) {
+      this.value = hosted;
+      return;
+    }
     try {
       try {
         await this.attach();
@@ -157,6 +163,11 @@ export class TunnelClient {
     this.timer.unref();
   }
   async retry() {
+    const hosted = hostedConnection(process.env, this.webEnabled);
+    if (hosted) {
+      this.value = hosted;
+      return this.status();
+    }
     try {
       this.value = await this.request("/retry", {});
     } catch {
